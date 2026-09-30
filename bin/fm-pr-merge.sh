@@ -4,24 +4,56 @@
 # The full canonical URL is parsed by bin/fm-pr-lib.sh. A GitHub pull request is
 # addressed through gh by the derived owner and repository; a GitLab merge
 # request is addressed through glab by the project URL rebuilt from the parsed
-# host and path, so any instance works and no host is hardcoded.
+# host and path, so any instance works and no host is hardcoded. A Gerrit change
+# is refused outright: that adapter is read-only, and the refusal at the parse
+# below owns why.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
 # A GitHub merge is refused unless every pre-merge condition holds, each read
 # live at merge time rather than taken from recorded metadata: the pull request
-# is open, not a draft, mergeable, free of conflicts, and every unwaived check
-# is green at the exact current head commit, where github_checks_not_green below
-# owns what makes a check green and judges each one by its current run.
-# Every failing condition is reported, not
-# just the first. The verified head is then passed to gh as
+# is open, not a draft, mergeable, free of conflicts, every unwaived check
+# is green at the exact current head commit, where
+# bin/fm-check-conclusion-lib.sh owns what makes a check green and judges each
+# one by its current run, and
+# every unwaived check the forge requires for the base branch has reported at
+# that head. When mergeable is the only failing condition and reads UNKNOWN,
+# meaning GitHub has not finished recomputing it, the caller re-reads and
+# re-checks every condition after a short bounded wait instead of refusing;
+# once that bound is spent it reports mergeability still pending rather than
+# unmergeable, with the same nonzero exit as any other refusal.
+# A required check that never reported is absent from the checks
+# list rather than red, so the shared
+# github_read_required_contexts reads the
+# required set from classic branch protection and active rulesets. Check-run
+# requirements retain their producer app binding: a same-named check run from another app cannot
+# satisfy them, and a duplicate name-only entry cannot weaken that binding.
+# Unbound requirements match by name. A bound requirement reported as a check
+# run also needs a matching producer in the check-runs read at the verified
+# head, while one reported as a commit status matches by name, because the
+# status carries no app id to compare. Status-creator app binding is not verified
+# here, so an attended --attended-override -- --admin merge can bypass that
+# protection without a missing-check waiver when a same-named status reported.
+# An unreadable producer read still refuses.
+# Successfully read requirements remain checked even if another
+# source fails, so known missing checks and all read errors are reported together.
+# The shared github_branch_rules_unavailable_on_plan owns the narrow plan-unavailable
+# exception; every other unreadable required source refuses.
+# Every failing condition is reported, not just the first.
+# The verified head is then passed to gh as
 # --match-head-commit, so a push that lands between that read and the merge
 # fails the merge instead of landing commits nothing verified. Reading that
 # state needs gh and jq, and either one absent stops the merge before any
 # state is recorded. An attended --allow-red <check-name> may be passed once,
 # with the name as a separate argument; it waives only checks with that exact
-# name, still requires every other check green, and still binds the head. It is
-# refused while the away-posture record exists, and it never
+# name, still requires every other check green, and still binds the head. Its
+# twin, an attended --allow-missing <check-name>, follows the same rules for one
+# required check that has not reported: it waives only that exact name, still
+# requires every other required check to have reported and every check to be
+# green unless separately waived by --allow-red. It matches the required
+# context name even for an app-bound requirement, and never waives an unreadable
+# required source or producer read. Both are
+# refused while the away-posture record exists, and neither
 # applies on GitLab, where a merge already requires the head pipeline to have
 # succeeded. After gh returns success, GitHub's live state is read back and
 # accepted only when the pull request is merged or in the merge queue. gh's
@@ -70,11 +102,14 @@
 # serializes the captain-hold check through the forge command. A still-held or
 # unreadable row refuses before that command, so a captain approval must be
 # recorded as an `answer --release` before this entrypoint is invoked. While
-# state/.afk-contract exists, a merge for this task also proceeds only if its
-# meta yolo=on or its id is in that record's merge-grant list; otherwise it is
-# held for the captain return. An unreadable record refuses rather than being
-# skipped. Neither posture releases a captain hold, and the grant lapses when
-# the record is archived.
+# an away record exists (a quiet-mode record is a present captain, so its
+# merges stay attended: bin/fm-afk-contract.sh mode) any green merge may
+# proceed under away authority:
+# the record's presence is the whole mechanical fact, and which merge the
+# captain's away words meant is the supervision session's reading
+# (bin/fm-branch-prompt.sh "Postures"). An unreadable record refuses rather
+# than being skipped, neither posture releases a captain hold, and away
+# authority lapses when the record is archived.
 # The authority read and synchronous forge command share the away record's
 # cross-subsystem lock, which bin/fm-afk-contract.sh owns, closing the common
 # live-owner TOCTOU; failure to take it refuses before the forge call. Async and
@@ -90,16 +125,19 @@
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
 # URL, nor --sha or --match-head-commit because the head comes only from the
-# live read. An existing task-meta pr= must equal the requested canonical URL;
-# a task cannot be rebound here. Auto-merge (--auto), a protection bypass
+# live read. An existing task-meta pr= must equal the requested canonical URL,
+# unless that bound PR has already merged - proven by its recorded merge
+# notification - in which case the task's next PR is accepted so several PRs
+# from one task can each merge in turn; while the bound PR is still unmerged a
+# different URL is refused. Auto-merge (--auto), a protection bypass
 # (--admin), and branch
 # deletion (--delete-branch, -d and short-flag clusters, and GitLab's
 # --remove-source-branch) are refused by default; --attended-override, parsed
 # before the optional -- separator, re-enables those forge flags for an
 # explicit captain instruction and never skips the live green check, the
-# away-grant check, or a captain hold.
+# away-record read, or a captain hold.
 #
-# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [-- <extra forge merge args>]
+# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [--allow-missing <check-name>] [-- <extra forge merge args>]
 #
 # On GitLab, this script confirms the MR is actually merged before reporting it;
 # an auto-merge-queued or unconfirmed request leaves the poll armed and records
@@ -124,6 +162,9 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-merge-authority-lib.sh"
 # shellcheck source=bin/fm-afk-contract.sh
 . "$SCRIPT_DIR/fm-afk-contract.sh"
+# The GitHub check-conclusion reads are shared with the open-PR CI watch.
+# shellcheck source=bin/fm-check-conclusion-lib.sh
+. "$SCRIPT_DIR/fm-check-conclusion-lib.sh"
 
 if [ "$#" -lt 2 ]; then
   echo "error: invalid PR merge request" >&2
@@ -145,9 +186,21 @@ PR_NUMBER=$FM_PR_NUMBER
 # glab resolves the instance from the project URL passed to -R, so the host is
 # rebuilt from the parsed identity rather than read from any ambient default.
 PROJECT_URL="https://$FM_PR_HOST/$FM_PR_PATH"
+# Firstmate never submits a Gerrit change, even though gerrit-axi can, so the
+# refusal is stated rather than left as a silently absent provider branch.
+# Submitting a Gerrit change means first recording a Code-Review+2, which is a
+# positive attributed claim that a named human approved the change, read by
+# colleagues and by any audit of the repository. Firstmate must not manufacture
+# one. The server permitting self-approval is what makes this a policy boundary
+# rather than a capability limit, so it is enforced here rather than assumed.
+if [ "$PROVIDER" = gerrit ]; then
+  echo "error: firstmate does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server" >&2
+  exit 2
+fi
 shift 2
 ATTENDED_OVERRIDE=false
 ALLOW_RED=()
+ALLOW_MISSING=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --attended-override)
@@ -168,12 +221,26 @@ while [ "$#" -gt 0 ]; do
       echo "error: --allow-red requires a separate check name argument" >&2
       exit 2
       ;;
+    --allow-missing)
+      [ -n "${2:-}" ] || { echo "error: --allow-missing requires a check name" >&2; exit 2; }
+      [ "${#ALLOW_MISSING[@]}" -eq 0 ] || { echo "error: --allow-missing may be specified only once" >&2; exit 2; }
+      ALLOW_MISSING+=("$2")
+      shift 2
+      ;;
+    --allow-missing=*)
+      echo "error: --allow-missing requires a separate check name argument" >&2
+      exit 2
+      ;;
     --) shift; break ;;
     *) break ;;
   esac
 done
 if [ "${#ALLOW_RED[@]}" -gt 0 ] && [ "$PROVIDER" = gitlab ]; then
   echo "error: --allow-red does not apply to GitLab, where a merge already requires the head pipeline to have succeeded" >&2
+  exit 2
+fi
+if [ "${#ALLOW_MISSING[@]}" -gt 0 ] && [ "$PROVIDER" = gitlab ]; then
+  echo "error: --allow-missing does not apply to GitLab, where a merge already requires the head pipeline to have succeeded" >&2
   exit 2
 fi
 
@@ -311,13 +378,17 @@ META="$STATE/$ID.meta"
 
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
-# Role partition: merging is MAIN-owned; the Pi supervision branch reports the
-# green PR and never merges (contract: bin/fm-lease-lib.sh; no-op in homes
-# without a branch actor). This precedes reading the task record, because the
-# wrong actor is refused for its role whatever that record says.
+# Role partition: merging is MAIN-owned while attended; the Pi supervision
+# branch reports the green PR and never merges (contract: bin/fm-lease-lib.sh;
+# no-op in homes without a branch actor). While the away-posture record exists
+# main is parked and this one action relocates to the branch, which then meets
+# exactly the same gates below as main would: green at its live head,
+# synchronous, under the record lock. This precedes
+# reading the task record, because the wrong actor is refused for its role
+# whatever that record says.
 # shellcheck source=bin/fm-lease-lib.sh
 . "$SCRIPT_DIR/fm-lease-lib.sh"
-fm_lease_forbid_branch "PR merge (fm-pr-merge)"
+fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
 if [ ! -f "$META" ] || [ -L "$META" ]; then
   echo "error: task metadata is unavailable" >&2
@@ -486,130 +557,27 @@ FIELDS
   FM_PR_GITLAB_ASYNC_CONFIGURED=$async_configured
 }
 
-# Every GitHub check that is not green in the given live pull-request JSON, one
-# name per line. An entry is green when it is a status context whose state is
-# SUCCESS, or a check run that completed with SUCCESS, NEUTRAL, or SKIPPED (so
-# a pending check is not green either). Exits nonzero when the rollup cannot be
-# read, so a malformed answer is a failed read and never an empty red set.
-#
-# The rollup can hold several runs of one check name at the same head, because
-# GitHub cancels a pull request's in-flight run when the base branch advances
-# and re-triggers it; the cancelled run stays in the rollup beside the passing
-# re-run. A check is therefore judged by its current run rather than by any run
-# that a later one superseded, which is what makes this agree with GitHub's own
-# CLEAN mergeStateStatus instead of refusing a pull request GitHub considers
-# mergeable.
-#
-# Supersession applies only among check runs with the same reported name. A
-# name is dropped from the red set only when every non-green run is COMPLETED,
-# has a whole-second UTC startedAt, and started strictly before a green run.
-# Status contexts are never grouped or superseded, and every non-green one is
-# reported independently. A still-running, queued, undated, or tied check run
-# stays red. A name whose runs are all green needs no timestamp, while a name
-# with no green run stays red.
-#
-# The reported name is also what --allow-red matches. An unnamed check run is
-# grouped alone and can neither supersede nor be superseded, because unrelated
-# unnamed checks must not be treated as one.
-github_checks_not_green() {
-  local json=$1
-  printf '%s' "$json" | jq -r '
-    def settled_at:
-      if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
-      then . else null end;
-    if (.statusCheckRollup | type) != "array" then error("no check rollup") else . end
-    | [ .statusCheckRollup
-        | to_entries[]
-        | .key as $i
-        | .value
-        | if .__typename == "CheckRun" then
-            {
-              kind: "check_run",
-              name: (.name // ""),
-              completed: (.status == "COMPLETED"),
-              ok: (.status == "COMPLETED" and (.conclusion == "SUCCESS" or .conclusion == "NEUTRAL" or .conclusion == "SKIPPED")),
-              at: (.startedAt | settled_at)
-            }
-            | . + {group: (if .name == "" then ["", $i] else [.name, -1] end)}
-          else
-            {kind: "status_context", name: (.context // ""), ok: (.state == "SUCCESS")}
-          end
-      ]
-    | . as $entries
-    | (
-        ($entries[]
-          | select(.kind == "status_context" and (.ok | not))
-          | .name
-        ),
-        ($entries
-          | [.[] | select(.kind == "check_run")]
-          | group_by(.group)[]
-          | {
-              name: .[0].name,
-              reds: [.[] | select(.ok | not)],
-              newest_green: ([.[] | select(.ok) | .at | select(. != null)] | max)
-            }
-          | select(
-              (.reds | length) > 0
-              and (
-                .newest_green == null
-                or any(.reds[]; (.completed | not) or .at == null)
-                or ([.reds[] | .at] | max) >= .newest_green
-              )
-            )
-          | .name
-        )
-      )
-    | if . == "" then "(unnamed check)" else . end
-  ' 2>/dev/null || return 1
-}
-
-# Pre-merge conditions for a GitHub pull request, read from one live view.
-# Sets FM_PR_MERGE_HEAD to the verified head on success.
+# Pre-merge conditions from a live PR view, base requirements, and head producers.
+# Sets FM_PR_MERGE_HEAD to the verified head on success. Returns 3, rather than
+# the usual 1, when mergeable=UNKNOWN is the only failing condition, so the
+# caller can retry a still-computing mergeability read instead of refusing.
 github_verify_mergeable() {
-  local json fields line red name covered
-  local total=0 named=0 refusals=''
+  local json red name covered missing unreported producers
+  local refusals='' mergeable_refusal=''
   local state='' draft='' mergeable='' merge_state='' live_head='' base=''
 
-  if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName,statusCheckRollup 2>/dev/null) \
-    || [ -z "$json" ]; then
+  if ! fm_pr_github_read_check_rollup "$URL"; then
     echo "error: could not read the GitHub pull request state before merging" >&2
     return 1
   fi
-  if ! fields=$(printf '%s' "$json" | jq -r '
-      if type == "object" then
-        "state=" + ((.state // "") | tostring),
-        "draft=" + (if (.isDraft | type) == "boolean" then (.isDraft | tostring) else "" end),
-        "mergeable=" + ((.mergeable // "") | tostring),
-        "merge_state=" + ((.mergeStateStatus // "") | tostring),
-        "head=" + ((.headRefOid // "") | tostring),
-        "base=" + ((.baseRefName // "") | tostring)
-      else
-        error("pull request payload is not an object")
-      end' 2>/dev/null); then
-    echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
-  fi
-  while IFS= read -r line; do
-    total=$((total + 1))
-    case "$line" in
-      state=*) state=${line#state=} ;;
-      draft=*) draft=${line#draft=} ;;
-      mergeable=*) mergeable=${line#mergeable=} ;;
-      merge_state=*) merge_state=${line#merge_state=} ;;
-      head=*) live_head=${line#head=} ;;
-      base=*) base=${line#base=} ;;
-      *) continue ;;
-    esac
-    named=$((named + 1))
-  done <<FIELDS
-$fields
-FIELDS
-  if [ "$named" -ne 6 ] || [ "$total" -ne 6 ] || [ -z "$base" ]; then
-    echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
-  fi
+  json=$FM_PR_CI_VIEW
+  state=$FM_PR_CI_STATE
+  mergeable=$FM_PR_CI_MERGEABLE
+  merge_state=$FM_PR_CI_MERGE_STATE
+  live_head=$FM_PR_CI_HEAD
+  base=$FM_PR_CI_BASE
 
+  draft=$(fm_pr_json_draft_state "$json")
   if ! fm_pr_head_valid "$live_head"; then
     echo "error: could not read the GitHub pull request head commit before merging" >&2
     return 1
@@ -630,7 +598,7 @@ FIELDS
     || refusals="$refusals  - the pull request is a draft
 "
   [ "$mergeable" = MERGEABLE ] \
-    || refusals="$refusals  - mergeable is \"${mergeable:-unreadable}\", not MERGEABLE
+    || mergeable_refusal="  - mergeable is \"${mergeable:-unreadable}\", not MERGEABLE
 "
   [ "$merge_state" != DIRTY ] \
     || refusals="$refusals  - mergeStateStatus is DIRTY (conflicts)
@@ -654,13 +622,52 @@ FIELDS
 $red
 EOF
 
+  unreported=''
+  if ! github_read_required_contexts "$base"; then
+    while IFS= read -r line; do
+      refusals="$refusals  - $line, so a required check that has not reported cannot be ruled out
+"
+    done <<EOF
+$FM_PR_GITHUB_REQUIRED_ERROR
+EOF
+  fi
+  producers='[]'
+  if ! github_read_required_producers "$live_head"; then
+    refusals="$refusals  - $FM_PR_GITHUB_REQUIRED_PRODUCERS_ERROR
+"
+  else
+    producers=$FM_PR_GITHUB_REQUIRED_PRODUCERS
+  fi
+  if ! missing=$(github_required_checks_missing "$json" "$FM_PR_GITHUB_REQUIRED" "$producers"); then
+    refusals="$refusals  - the GitHub pull request check rollup could not be read
+"
+  else
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      [ "${#ALLOW_MISSING[@]}" -gt 0 ] && [ "${ALLOW_MISSING[0]}" = "$name" ] && continue
+      refusals="$refusals  - required check '$name' has not reported at head $live_head
+"
+      unreported="${unreported:+$unreported, }$name"
+    done <<EOF
+$missing
+EOF
+  fi
+
+  if [ -n "$mergeable_refusal" ]; then
+    if [ -z "$refusals" ] && [ "$mergeable" = UNKNOWN ]; then
+      return 3
+    fi
+    refusals="$refusals$mergeable_refusal"
+  fi
+
   if [ -n "$refusals" ]; then
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
+    [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
     return 1
   fi
-  printf 'verified: %s is open and mergeable, with every required check green at head %s\n' \
+  printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
   FM_PR_GITHUB_BASE=$base
@@ -763,24 +770,6 @@ github_read_outcome() {
   return 1
 }
 
-github_urlencode_path_segment() {
-  local LC_ALL=C input=$1 encoded='' char octet hex
-  while [ -n "$input" ]; do
-    char=${input%"${input#?}"}
-    input=${input#?}
-    case "$char" in
-      [-._~a-zA-Z0-9]) encoded=$encoded$char ;;
-      *)
-        printf -v octet '%d' "'$char"
-        [ "$octet" -ge 0 ] || octet=$((octet + 256))
-        printf -v hex '%02X' "$octet"
-        encoded=$encoded%$hex
-        ;;
-    esac
-  done
-  printf '%s' "$encoded"
-}
-
 # Read the effective merge-queue method for the observed base branch. The four
 # situations the refusal has to keep apart - no queue rule, a rules response
 # that could not be read, several rules that disagree, and a rule whose method
@@ -805,18 +794,12 @@ github_read_queue_method() {
     2>"$api_err"); then
     api_err_text=$(cat "$api_err" 2>/dev/null)
     rm -f "$api_err"
-    # A plan-gated 403 on this endpoint ("Upgrade to GitHub Pro or make this
-    # repository public") means the repository's plan cannot expose branch
-    # rules at all, on GitHub or GitHub Enterprise Server - not that this
-    # script failed to read them. A repository that cannot have branch rules
-    # cannot have a merge_queue rule either, so that specific 403 resolves to
-    # no queue rather than the generic unreadable status. Any other failure
-    # (auth, rate limit, network, a 404, an unrelated 403) stays unreadable.
-    case "$api_err_text" in
-      *"Upgrade to GitHub Pro or make this repository public"*)
-        FM_PR_GITHUB_QUEUE_STATUS=none
-        ;;
-    esac
+    # A repository that cannot have branch rules cannot have a merge_queue
+    # rule either, so that specific refusal resolves to no queue rather than
+    # the generic unreadable status.
+    if github_branch_rules_unavailable_on_plan "$api_err_text"; then
+      FM_PR_GITHUB_QUEUE_STATUS=none
+    fi
     return 0
   fi
   rm -f "$api_err"
@@ -859,7 +842,7 @@ METHODS
 }
 
 record_pr_metadata() {
-  if ! "$SCRIPT_DIR/fm-pr-check.sh" "$ID" "$URL"; then
+  if ! FM_PR_CHECK_MERGE=1 "$SCRIPT_DIR/fm-pr-check.sh" "$ID" "$URL"; then
     return 1
   fi
   grep -qxF "pr=$URL" "$META" || {
@@ -886,27 +869,17 @@ require_released_captain_hold() {
 }
 
 FM_PR_MERGE_AUTHORITY=
-# The gate on top of the shared authority read. bin/fm-merge-authority-lib.sh
-# owns what the away-posture record and the task's recorded yolo posture say;
-# this function owns what a merge run may do about it, so the answer the merge
-# poll later tags its ledger row with is the same answer gated here.
-require_away_merge_grant() {
+# The authority read. bin/fm-merge-authority-lib.sh owns what the away-posture
+# record's presence means; this function owns what a merge run may do about it,
+# so the answer the merge poll later tags its ledger row with is the same answer
+# resolved here. An unreadable record refuses rather than being skipped.
+resolve_merge_authority() {
   FM_PR_MERGE_AUTHORITY=
   if fm_merge_authority_resolve "$FM_HOME" "$STATE" "$META" "$ID"; then
     FM_PR_MERGE_AUTHORITY=$FM_MERGE_AUTHORITY
     return 0
   fi
-  case "$FM_MERGE_AUTHORITY_REASON" in
-    record-unreadable)
-      echo "error: PR merge refused - the away-posture record could not be read; nothing was merged" >&2
-      ;;
-    grants-unreadable)
-      echo "error: PR merge refused - the away-posture record's grants could not be read; nothing was merged" >&2
-      ;;
-    *)
-      echo "error: task $ID is held for the captain return" >&2
-      ;;
-  esac
+  echo "error: PR merge refused - the away-posture record could not be read; nothing was merged" >&2
   return 1
 }
 
@@ -925,7 +898,7 @@ hold_away_record_for_merge() {
 
 require_current_away_authority() {
   FM_PR_AWAY_POSTURE=false
-  if fm_afk_contract_present "$STATE"; then
+  if fm_afk_contract_away_present "$STATE"; then
     FM_PR_AWAY_POSTURE=true
     if [ "$PROVIDER" = github ] && [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ]; then
       echo "error: --auto is attended-only; while the away-posture record exists only a synchronous merge may run under its authority lock" >&2
@@ -937,9 +910,14 @@ require_current_away_authority() {
       return 2
     fi
   fi
-  require_away_merge_grant || return 1
+  fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
+  resolve_merge_authority || return 1
   if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "${#ALLOW_RED[@]}" -gt 0 ]; then
     echo "error: --allow-red is attended-only; while the away-posture record exists the green check is absolute" >&2
+    return 2
+  fi
+  if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "${#ALLOW_MISSING[@]}" -gt 0 ]; then
+    echo "error: --allow-missing is attended-only; while the away-posture record exists every required check must report" >&2
     return 2
   fi
 }
@@ -963,8 +941,7 @@ persist_accepted_merge_authority() {
 
 # While away, a merge proceeds only when the base branch's rules prove no
 # merge queue, because a queued merge can land after its away authority
-# lapses; this holds regardless of which away authority (a named merge grant
-# or a standing yolo=on posture) let the merge run at all. A repository whose
+# lapses with the record's archive. A repository whose
 # plan does not expose branch rules at all (GitHub's "Upgrade to GitHub Pro or
 # make this repository public" 403) proves that on its own, since such a
 # repository cannot have a merge_queue rule either; see
@@ -977,7 +954,7 @@ refuse_github_queue_while_away() {
   [ "$FM_PR_AWAY_POSTURE" = true ] || return 0
   # Accepted confused-agent-grade limitation, as in bin/fm-lease-lib.sh, not an
   # oversight: a queue rule or PR base change after this preflight can still
-  # enqueue the merge, which can land after its away grant lapses.
+  # enqueue the merge, which can land after its away authority lapses.
   github_read_queue_method
   [ "$FM_PR_GITHUB_QUEUE_STATUS" = none ] && return 0
   echo "error: GitHub merge refused while away because the base branch's merge-queue state does not prove an immediate merge; nothing was handed to the forge" >&2
@@ -989,6 +966,13 @@ require_recorded_pr_identity() {
   existing=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
   [ -n "$existing" ] || return 0
   [ "$existing" = "$URL" ] && return 0
+  # Parsed in a subshell so FM_PR_* stays the new URL's identity for every
+  # caller after this gate; only the already-notified verdict escapes.
+  if ( fm_pr_url_parse "$existing" \
+    && fm_pr_poll_merge_already_notified "$STATE" "$ID" \
+      "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" ); then
+    return 0
+  fi
   echo "error: task $ID is bound to $existing, not $URL" >&2
   return 1
 }
@@ -1143,7 +1127,35 @@ case "$PROVIDER" in
       merge_args=(--squash)
     fi
     FM_PR_GITHUB_CALLER_METHOD=$(caller_merge_method "$@")
-    github_verify_mergeable || exit 1
+    # mergeable reads UNKNOWN for a short while after a push or base-branch
+    # change while GitHub recomputes it; retry a bounded number of times,
+    # re-reading and re-checking every live condition on each attempt, rather
+    # than refusing a pull request that is simply still being computed. The
+    # delay is capped at 0-10 seconds so the wait stays short under the lock.
+    mergeable_retry_delay=${FM_PR_GITHUB_MERGEABLE_RETRY_DELAY:-3}
+    case "$mergeable_retry_delay" in
+      [0-9] | 10) ;;
+      *) mergeable_retry_delay=3 ;;
+    esac
+    mergeable_attempt=1
+    while :; do
+      mergeable_status=0
+      github_verify_mergeable || mergeable_status=$?
+      if [ "$mergeable_status" -eq 0 ]; then
+        break
+      fi
+      if [ "$mergeable_status" -ne 3 ] || [ "$mergeable_attempt" -ge 5 ]; then
+        break
+      fi
+      sleep "$mergeable_retry_delay"
+      mergeable_attempt=$((mergeable_attempt + 1))
+    done
+    if [ "$mergeable_status" -ne 0 ]; then
+      if [ "$mergeable_status" -eq 3 ]; then
+        printf 'error: mergeability for %s is still being computed by GitHub; retry shortly\n' "$URL" >&2
+      fi
+      exit 1
+    fi
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
     hold_away_record_for_merge || exit 1
