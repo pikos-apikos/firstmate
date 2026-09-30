@@ -246,6 +246,12 @@ Load `validation-supervision` when a ship starts or already has an active no-mis
 
 Load `ship-landing` when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.
 
+### Open pull requests turning red
+
+An open-pull-request CI wake names a fleet pull request whose check conclusion changed: it is now failing, it recovered, or a required check has not reported.
+It is evidence about a merge decision, never authority: relay the URL and the check name, and let the merge path and its authority own any merge, waiver, or retry.
+`bin/fm-pr-ci.sh`'s header owns what it sweeps, what it remembers, and when it stays silent.
+
 ### Scout outcome and promotion
 
 Load `scout-completion` when a scout reports completion, presents a visual artifact for iteration, or is being considered for promotion to implementation.

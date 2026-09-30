@@ -1610,6 +1610,14 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     "$SCRIPT_DIR/fm-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
   fi
+  # The open-PR CI watch is a fleet check, so it is armed on every local startup
+  # rather than per task: it watches the fleet's own pull requests, not any one
+  # delivery. It reads no scope and no forge here, so a home with no configured
+  # scope arms a sweep that stays silent and sweeps nothing.
+  if local_phase && command -v jq >/dev/null 2>&1 && [ -x "$SCRIPT_DIR/fm-pr-ci.sh" ]; then
+    "$SCRIPT_DIR/fm-pr-ci.sh" arm >/dev/null \
+      || echo "MISSING: the open-PR CI watch could not be armed; red checks on open pull requests are unwatched"
+  fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"

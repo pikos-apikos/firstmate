@@ -94,6 +94,17 @@ Each effective `FM_HOME` contains private operational directories.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
+`config/forge-scope` (local, gitignored) lists, one per non-empty non-comment line, the owners or `owner/repository` entries whose GitHub pull requests this home's monitoring sweeps may read.
+An owner entry permits every repository under it; an `owner/repository` entry permits exactly that one, matched as exact strings.
+This is a watch-scope rule, not a merge rule: it bounds what this home watches and never changes who may merge anything.
+
+A sweep derives its repository set from this file, never from a clone's `origin` remote, and a registered project's upstream remote cannot widen it.
+That distinction is load-bearing rather than stylistic: a firstmate clone commonly has its `origin` on the upstream repository while the pull requests this fleet owns live on the captain's own fork, so a check that trusted the remote would poll the wrong repository and miss every pull request it exists to watch.
+`kunchenguid/*` is not the captain's repository and carries roughly 30 open pull requests contributed by other people, so a sweep over it is pure noise.
+
+An absent, unreadable, or unusable file sweeps nothing and is reported once, which keeps an open pull request unmeasured rather than falsely proven green, and keeps restoring the file from re-alarming about every conclusion at once.
+`bin/fm-pr-ci.sh`'s header owns the sweep and this file's effect on it.
+
 `projects/` holds local project clones.
 Firstmate reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
 Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
@@ -103,6 +114,8 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 - `bin/fm-spawn.sh` owns the base task-metadata fields it emits, while the runtime-backend section below owns backend-specific fields and selector interpretation.
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
+
+- `bin/fm-pr-ci.sh` owns the open-pull-request CI watch: which of this fleet's pull requests it may read, the conclusions it remembers, and the `config/forge-scope` entries that bound the sweep. `bin/fm-check-conclusion-lib.sh` owns the GitHub check-conclusion reads it shares with `bin/fm-pr-merge.sh`.
 
 - The producing PR and Relay helpers own the fields they append, [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh) owns status-event vocabulary, optional emission-time syntax, and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
