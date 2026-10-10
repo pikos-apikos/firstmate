@@ -268,6 +268,17 @@ EOF
   FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
     NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
     "$CHECKPOINT" --seconds 8 >"$home/changed" 2>"$home/changed-err" || status=$?
+  if [ "$status" -eq 0 ] && grep -q '^check: rearm-resurface$' "$home/changed"; then
+    drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+    cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+    generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+    FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+      || fail "could not acknowledge checkpoint handoff before changed gate"
+    status=0
+    FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+      NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+      "$CHECKPOINT" --seconds 8 >"$home/changed" 2>"$home/changed-err" || status=$?
+  fi
   expect_code 0 "$status" "changed findings at the same scalar gate must wake"
   assert_contains "$(cat "$home/changed")" 'check: validation demo' "changed scalar gate was lost"
   drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
@@ -345,8 +356,33 @@ EOF
   pass "slow earlier ships yield to later validation gates"
 }
 
+test_single_ship_cursor_respects_validation_cadence() {
+  local home status calls
+  home=$(make_home validation-single-cursor)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/single
+  fm_write_meta "$home/state/only.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+calls=$(cat "$NM_CALLS" 2>/dev/null || printf '0')
+printf '%s\n' "$((calls + 1))" > "$NM_CALLS"
+exit 1
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=30 \
+    NM_CALLS="$home/nm-calls" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 4 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 124 "$status" "single-ship cadence checkpoint: $(cat "$home/out" "$home/err")"
+  calls=$(cat "$home/nm-calls" 2>/dev/null || printf '0')
+  [ "$calls" -le 3 ] || fail "single ship was polled $calls times inside the 30s cadence"
+  pass "single-ship validation cycle advances its cadence"
+}
+
 test_validation_gate_without_worker_status_is_delivered
 test_slow_earlier_ships_do_not_starve_later_gate
+test_single_ship_cursor_respects_validation_cadence
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment

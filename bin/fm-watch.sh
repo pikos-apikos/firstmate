@@ -1994,7 +1994,7 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
 validation_transitions_tick() {
   local interval=${FM_NM_CHECK_INTERVAL:-30} meta task snapshot identity receipt token previous
-  local run state step digest wt telemetry reason tmp existing queue_key cursor selected selected_task
+  local run state step digest wt telemetry reason tmp existing queue_key cursor selected selected_task wrapped=0
   case "$interval" in ''|*[!0-9]*) interval=30 ;; esac
   [ "$interval" -gt 0 ] 2>/dev/null || interval=30
   [ "$(age_of "$STATE/.last-nm-check")" -ge "$interval" ] || return 0
@@ -2015,6 +2015,7 @@ validation_transitions_tick() {
     fi
   done
   if [ -z "$selected" ] && [ -n "$cursor" ]; then
+    wrapped=1
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       [ "$(fm_meta_get "$meta" kind)" = ship ] || continue
@@ -2037,7 +2038,7 @@ validation_transitions_tick() {
     rm -f -- "$tmp"
     return 1
   fi
-  if [ -n "$cursor" ] && [[ "$task" < "$cursor" ]]; then
+  if [ "$wrapped" = 1 ]; then
     touch "$STATE/.last-nm-check"
   fi
   [ -n "$snapshot" ] || return 0
