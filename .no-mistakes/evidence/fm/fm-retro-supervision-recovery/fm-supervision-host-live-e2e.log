@@ -1,0 +1,9 @@
+not ok - the real engine did not handle the away wake (2.1.282 (Claude Code))
+--- host.out
+
+--- host log
+1791649393	start	gen=host-3438166-1791649392	primary=claude
+1791649396	failed	turn=host-3438166-1791649392.1	posture=away	rc=1	reports=0	unacked=1 2	error=1 cost=0 conversation_cost=0 input=0 cache_read=0 cache_write=0 output=0 turns=1		signal: /tmp/fm-supervision-host-live.hDxRF5/fm/state/demo.status
+--- queue
+1791649393	1	signal	demo.status	signal: /tmp/fm-supervision-host-live.hDxRF5/fm/state/demo.status
+1791649393	2	signal	demo.status	signal: /tmp/fm-supervision-host-live.hDxRF5/fm/state/demo.status

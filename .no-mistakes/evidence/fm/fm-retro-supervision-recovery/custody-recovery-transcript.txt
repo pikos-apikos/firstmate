@@ -1,0 +1,2 @@
+ok - read-only plan and repeated supported fast-forward custody return
+ok - missing checkout, divergence, CLI refusal and caller dirt preserve both histories
