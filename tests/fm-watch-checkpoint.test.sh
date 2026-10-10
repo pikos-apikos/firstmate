@@ -196,6 +196,107 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
   pass "checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint"
 }
 
+# The validation daemon changes state even when the worker pane and status log
+# stay unchanged. Use the real crew-state attribution over a real repository.
+test_validation_gate_without_worker_status_is_delivered() {
+  local home status head drained
+  home=$(make_home validation-gate)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/checkpoint
+  head=$(git -C "$home/wt" rev-parse HEAD)
+  fm_write_meta "$home/state/demo.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  'axi status'|'axi status --run RUN1') cat "$NM_FIXTURE" ;;
+  axi)
+    state=$(sed -n 's/^  status: //p' "$NM_FIXTURE" | head -1)
+    printf 'repo: %s\ncount: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  RUN1,fm/checkpoint,%s,%s,\n' "$PWD" "$state" "$NM_HEAD" ;;
+  'daemon status') exit 0 ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: running
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,awaiting_approval,1,100
+branch_sync:
+  state: pipeline_owned
+gate: review
+findings[1]{id,severity,file,action,description}:
+  finding-1,warning,bin/demo.sh,ask-user,needs a decision
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 0 "$status" "a validation gate must wake without worker status or pane churn: $(cat "$home/out" "$home/err")"
+  assert_contains "$(cat "$home/out")" 'check: validation demo' "gate transition was not delivered"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  assert_contains "$drained" 'run=RUN1 step=review state=parked' "gate identity missing from durable wake"
+  assert_contains "$drained" 'invocations=unknown' "missing usage must be explicit"
+  # Presentation alone does not consume the gate. Starting another checkpoint
+  # replays the pending durable wake, even if handling was interrupted.
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 5 >"$home/replay" 2>"$home/replay-err" || status=$?
+  expect_code 0 "$status" "unacknowledged gate must survive interrupted handling"
+  [ "$(awk -F '\t' '$4 ~ /^validation:/ {n++} END {print n+0}' "$home/state/.wake-queue")" = 1 ] \
+    || fail "repeated checkpoint duplicated the gate transition"
+  local cutoff generation
+  cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+  generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+  FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "could not acknowledge handled gate"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 3 >"$home/repeat" 2>"$home/repeat-err" || status=$?
+  expect_code 124 "$status" "the acknowledged unchanged gate must stay silent: $(cat "$home/repeat")"
+  # The CLI's scalar gate and top-level findings can change while its step
+  # remains parked. A changed finding must produce one new actionable wake.
+  sed 's/needs a decision/needs another decision/' "$home/status.toon" > "$home/changed.toon"
+  mv "$home/changed.toon" "$home/status.toon"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/changed" 2>"$home/changed-err" || status=$?
+  expect_code 0 "$status" "changed findings at the same scalar gate must wake"
+  assert_contains "$(cat "$home/changed")" 'check: validation demo' "changed scalar gate was lost"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+  generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+  FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "could not acknowledge changed gate"
+  # The checkpoint has expired and there is no watcher now. The daemon's
+  # terminal return must be picked up by the next supported foreground cycle.
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: failed
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,failed,1,200
+outcome: failed
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/terminal" 2>"$home/terminal-err" || status=$?
+  expect_code 0 "$status" "terminal daemon return after checkpoint expiry must wake"
+  assert_contains "$(cat "$home/terminal")" 'run=RUN1 step=review state=failed' "terminal transition lost after checkpoint expiry"
+  pass "checkpoint delivers authoritative validation gates without a worker status signal"
+}
+
+test_validation_gate_without_worker_status_is_delivered
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment

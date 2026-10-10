@@ -7,7 +7,9 @@
 # (the custody check a Gerrit no-mistakes ready report must pass). Crew-state binds
 # an EXECUTING run (pending, running, fixing or ci) on the task's branch
 # regardless of head (fm_nm_run_is_executing); every other run still needs
-# strict branch-and-head identity. Both callers then recognize a provable
+# strict branch-and-head identity, except the exact CLI caller binding for a
+# terminal custody blocker used by current-state reporting only.
+# Both callers then recognize a provable
 # pipeline-owned continuation through fm_nm_runs_status_for_worktree below:
 # crew-state for an ACTIVE run - parked, or executing with the daemon answered
 # down - so a fix round never reads as an older
@@ -47,6 +49,41 @@ fm_nm_run_checked() {  # <dir> <timeout_secs> <args...>
 
 fm_nm_run() {  # <dir> <timeout_secs> <args...>
   fm_nm_run_checked "$@" || true
+}
+
+# Watcher transition identity from fm-crew-state --validation-snapshot. Only
+# an attributed full run is eligible. Gate content and its completed round's
+# step row distinguish new findings even when the pane never changes. Elapsed
+# parked time, help text, and token totals cannot mint a new transition.
+# Prints run|state|step|digest; empty means no actionable, verified transition.
+fm_nm_transition_identity() {  # <snapshot>
+  local snapshot=$1 first state run step detail digest
+  first=${snapshot%%$'\n'*}
+  case "$first" in 'state: '*·*'source: run-step') ;; *) return 0 ;; esac
+  state=${first#state: }; state=${state%% *}
+  case "$state" in parked|done|failed|blocked) ;; *) return 0 ;; esac
+  run=$(fm_nm_strip_quotes "$(fm_nm_field "$snapshot" id)")
+  case "$run" in ''|*[!a-zA-Z0-9_-]*) return 0 ;; esac
+  step=$(fm_nm_strip_quotes "$(fm_nm_field "$snapshot" step)")
+  [ -n "$step" ] || step=$(fm_nm_strip_quotes "$(fm_nm_field "$snapshot" gate)")
+  if [ -z "$step" ]; then
+    step=$(printf '%s\n' "$snapshot" | awk -F, '
+      /^[ ]+[^,]+,(running|fixing|failed|awaiting_approval|fix_review),/ {gsub(/^[ ]+/, "", $1); print $1; exit}')
+  fi
+  step=${step:-unknown}
+  detail=$(printf '%s\n' "$snapshot" | awk -F, -v step="$step" '
+    /^gate:/ { gate=1; print; next }
+    /^findings\[[0-9]+\]\{/ { findings=1; print; next }
+    /^[^ ]/ { gate=0; findings=0 }
+    {name=$1; sub(/^[ ]+/, "", name)}
+    gate || findings || (NF > 1 && name == step) || /^[ ]+[^,]+,(awaiting_approval|fix_review|failed),/ || /^[ ]+(head_sha|outcome):/ {print}
+  ')
+  detail="$detail
+$(fm_nm_branch_sync_state "$snapshot")
+$(fm_nm_branch_sync_nested "$snapshot" next_action code)
+$(fm_nm_branch_sync_nested "$snapshot" pipeline current_head)"
+  digest=$(printf '%s\n%s\n%s\n%s' "$run" "$state" "$step" "$detail" | cksum | awk '{print $1 "-" $2}')
+  printf '%s|%s|%s|%s\n' "$run" "$state" "$step" "$digest"
 }
 
 fm_nm_trim() {
@@ -356,15 +393,32 @@ fm_nm_run_is_active() {  # <toon-output>
   case "$status" in completed|failed|cancelled) return 1 ;; esac
 }
 
+# Terminal custody is an obligation, not a successful terminal outcome. Only
+# the authoritative CLI's exact caller branch AND full HEAD may bind it after
+# histories diverge. Selection/ledger agreement remains the caller's job.
+fm_nm_terminal_custody_blocks() {  # <toon-output> <worktree>
+  local status=$1 wt=$2 branch head
+  fm_nm_run_is_active "$status" && return 1
+  case "$(fm_nm_branch_sync_state "$status")" in
+    blocked*) ;;
+    *) [ "$(fm_nm_branch_sync_nested "$status" next_action code)" = recover_custody ] || return 1 ;;
+  esac
+  branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
+  head=$(git -C "$wt" rev-parse --verify HEAD 2>/dev/null) || return 1
+  [ "$(fm_nm_strip_quotes "$(fm_nm_field "$status" branch)")" = "$branch" ] || return 1
+  [ "$(fm_nm_branch_sync_nested "$status" local branch)" = "$branch" ] || return 1
+  [ "$(fm_nm_branch_sync_nested "$status" local head)" = "$head" ]
+}
+
 # The custody exemption to the head rule above: while the pipeline OWNS the
 # branch (branch_sync.state=pipeline_owned), the daemon's own branch
 # attribution IS the attribution for an ACTIVE run, and
 # head equality must not be required - the pipeline's lane head is routinely
 # not a git object in the task worktree (rebase and fix commits that were
 # never pushed back), so the head rule rejects exactly the run that is most
-# current. The exemption never applies to a terminal run: a terminal run has
-# released the branch, and binding one by branch name alone is the historical
-# reused-branch misattribution the head rule exists to prevent.
+# current. The exemption never applies to a terminal run: terminal custody
+# blockers use the exact caller binding above, and branch name alone causes
+# the reused-branch misattribution the head rule exists to prevent.
 fm_nm_run_is_pipeline_owned_active() {  # <toon-output>
   [ "$(fm_nm_branch_sync_state "$1")" = pipeline_owned ] || return 1
   fm_nm_run_is_active "$1"

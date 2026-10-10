@@ -353,3 +353,40 @@ test_record_appends_once_per_task_incarnation
 test_disabled_record_does_not_read_or_create_spend_data
 test_state_db_without_nm_home_or_home_uses_the_account_home
 test_refusals
+
+# Gate summaries use the supported CLI stats export rather than raw cumulative
+# counters. Both rows belong to one resumed session; the round deltas are 100
+# and 30, while the second raw counter already contains the first 100.
+test_cli_snapshot_uses_round_deltas_and_reports_missing_usage() {
+  local d out
+  d=$(make_case cli-snapshot)
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = 'stats --run RUN1' ] || exit 1
+cat <<'EOF'
+run RUN1 (running), parked at gates 1s total
+STEP    ROUND  PURPOSE     AGENT  MODEL  SESSION  KEY  DURATION  MODEL  SUBPROC  RT  TOOLS (w/t/e/r/g/o)  FIND  WORK (f/l)  FALLBACK  EXIT
+review  1      review      codex  model  cold     a    1s        1s     0s       1   0 0/0/0/0/0/0       1     2/10        -         ok
+review  2      review-fix  codex  model  resumed  a    1s        1s     0s       1   0 0/0/0/0/0/0       -     3/30        -         ok
+review  2      review      codex  model  cold     b    1s        1s     0s       1   0 0/0/0/0/0/0       1     3/30        -         ok
+review  3      review      codex  -      cold     c    1s        -      -        -   -                    1     4/40        -         cancelled
+
+STEP    ROUND  PURPOSE     SESSION  Δ IN (round)  Δ OUT  Δ CACHE RD  IN (raw)  OUT (raw)  CACHE RD (raw)  CACHE WR  FRESH IN  REASON
+review  1      review      cold     100           10     80          100       10         80              -         20        0
+review  2      review-fix  resumed  30            5      20          130       15         100             -         30        0
+review  2      review      cold     50            8      40          50        8          40              -         10        0
+review  3      review      cold     -             -      -           -         -          -               -         -         -
+EOF
+SH
+  chmod +x "$d/fakebin/no-mistakes"
+  out=$(PATH="$d/fakebin:$PATH" "$SPEND" show "$d/wt" RUN1)
+  assert_contains "$out" 'invocations=4' "invocation count missing"
+  assert_contains "$out" 'models=model,unknown' "missing model must stay unknown"
+  assert_contains "$out" 'input=180+unknown(1)' "raw resumed counters were summed or missing usage hidden"
+  assert_contains "$out" 'cached=140+unknown(1)' "cache read round deltas incorrect"
+  assert_contains "$out" 'output=23+unknown(1)' "output round deltas incorrect"
+  assert_contains "$out" 'repeated-finding-rounds=3' "repeated finding rounds must raise supervisor attention"
+  assert_contains "$out" 'growing-scope=2/10->4/40' "scope growth signal missing"
+  pass "CLI telemetry uses round deltas, retains unknowns, and flags repeated findings and scope growth"
+}
+test_cli_snapshot_uses_round_deltas_and_reports_missing_usage

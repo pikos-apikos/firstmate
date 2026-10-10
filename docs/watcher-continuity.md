@@ -4,7 +4,7 @@ This document explains how Firstmate keeps the watcher re-armed after a wake, ho
 Read it when debugging a supervision gap or changing a harness's re-arm path.
 
 The watcher remains intentionally one-shot: one actionable reason closes one watcher cycle.
-Must-work continuity now lives above that process boundary instead of depending on the model remembering a re-arm step.
+Automatic continuity lives above that process boundary on harnesses with a verified re-arm owner.
 In this document, an arm is one run of `bin/fm-watch-arm.sh`, which starts a watcher cycle or attaches to one and returns the cycle's reason.
 
 | Topic | Section |
@@ -127,6 +127,16 @@ The host owns successive watcher cycles through the same arm.
 ## Actionable wake ordering
 
 This section covers what each re-arm owner does between an actionable close and the wake reaching the model.
+
+### Validation gates and terminal custody
+
+The existing watcher polls attributed no-mistakes run snapshots even when the worker emits no status or pane change.
+`bin/fm-watch.sh` owns transition identity, cadence, and queue-before-receipt delivery; an interrupted handler leaves the durable wake available for replay and acknowledgement.
+`bin/fm-crew-state.sh` owns run selection and the exact caller binding that keeps a terminal custody blocker visible after histories diverge.
+Transition wakes carry the supported CLI's model, invocation, and round-delta token summary, with explicit unknowns when usage is absent.
+Repeated finding rounds and growing review scope request supervisor attention through that same bounded transition wake; they never answer a gate or start another validation loop.
+`bin/fm-pipeline-spend.sh` owns summary invocation, and `bin/fm-nm-stats.py` owns delta accounting and attention thresholds.
+For custody recovery, `bin/fm-nm-recover.sh` owns the guarded CLI-only boundary and preserved-evidence handoff; unavailable checkouts and divergent histories remain unsupported when the CLI refuses them.
 
 ### Pi, omp, and OpenCode successor start
 
@@ -526,6 +536,11 @@ The other harnesses rely on these mechanisms:
 - Claude depends on the Stop `asyncRewake` rewake.
 - Cursor depends on its awaited stop-hook park.
 - Grok retains native background-completion notifications.
-- Codex retains bounded foreground checkpoints.
+- Codex retains bounded foreground checkpoints and requires an active turn to drain and start the next checkpoint after expiry.
+
+A quiet checkpoint is not an unattended continuation guarantee.
+Its expiry stops that foreground cycle and prints `continuation-required`; a gate arriving later remains discoverable through the next checkpoint and durable drain, but cannot itself resume an idle Codex model.
+Already-pending durable wakes return immediately for handling, including wakes presented before an interrupted acknowledgement.
+`tests/fm-watch-checkpoint.test.sh` covers quiet daemon gates, terminal delivery after expiry, duplicate suppression, and interrupted handling; `tests/fm-nm-recover.test.sh` covers preserved caller work and CLI recovery refusals.
 
 [`verification/supervision.md`](verification/supervision.md#watcher-continuity) records the current cross-harness live evidence, the dated Stop-owned Claude auto-arm results, and exact opt-in commands.

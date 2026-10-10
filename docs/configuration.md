@@ -585,6 +585,7 @@ The flag is a home-local preference and is not inherited by secondmate homes.
 The optional local, gitignored `config/pipeline-spend` presence flag opts this home into recording per-task no-mistakes pipeline spend in `data/pipeline-spend.jsonl` during teardown.
 When the flag is absent, teardown skips recording and the recorder exits before reading task metadata, no-mistakes state, or the spend ledger.
 An existing ledger is left untouched while recording is disabled.
+Live validation summaries use the independent read-only CLI path documented in [`watcher-continuity.md`](watcher-continuity.md#validation-gates-and-terminal-custody), without enabling teardown recording.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

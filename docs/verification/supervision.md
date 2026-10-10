@@ -522,13 +522,31 @@ grok 0.2.103 (89c3d36fb6f1) [stable]
 | Harness | Exact opt-in command | Observed guarantee |
 | --- | --- | --- |
 | Claude | `FM_CLAUDE_LIVE_E2E=1 tests/fm-claude-stop-autoarm-live-e2e.test.sh` | The tracked `SessionStart` hook reclaimed a stale owner before two Stop-owned cycles, and a competing live owner prevented arm, rewake, epoch write, or lock replacement. |
-| Codex | `FM_CODEX_LIVE_E2E=1 tests/fm-codex-continuity-live-e2e.test.sh` | The one-second foreground checkpoint returned without switching to the arm wrapper. |
+| Codex | `FM_CODEX_LIVE_E2E=1 bash tests/fm-codex-continuity-live-e2e.test.sh` | The foreground checkpoint expires explicitly, and the next checkpoint and drain deliver a later synthetic status event; codex-cli 0.161.0, 2026-10-10. |
 | OpenCode | `FM_OPENCODE_LIVE_E2E=1 tests/fm-opencode-primary-live-e2e.test.sh` | A verified successor existed before prompt handling, with no model re-arm or turn-end fallback. |
 | Pi | `FM_PI_LIVE_E2E=1 FM_PI_LIVE_WATCH_ONLY=1 tests/fm-pi-primary-live-e2e.test.sh` | Three consecutive actionable closes each produced a ledger-linked successor, and an intentional stopped-chain failure still raised the outage alarm. |
 | omp | `FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` | One initial `fm_watch_arm_omp` invocation (the openai-codex model reaches extension tools through omp's `xd://` virtual-file bridge, a `write` to `xd://fm_watch_arm_omp`, counted as the same invocation) started a live watcher; an actionable close spawned a ledger-linked successor and woke main exactly once; the lab is reaped by path, and omp 18.1.11 did not exit within 30s of its rpc stdin closing, recorded as a note. omp 18.1.11, 2026-09-05. |
 | Grok | `FM_GROK_LIVE_E2E=1 tests/fm-grok-continuity-live-e2e.test.sh` | Native task completion surfaced the actionable close and the cycle ledger recorded `reason=actionable-signal`. |
 
 Pi 0.81.1 repeated the continuity and clean-exit lifecycle on 2026-07-23 after the Calm presentation changes.
+
+Codex's foreground boundary was verified on 2026-10-10 in a named Herdr 0.9.0 session with the default-session safety tripwire:
+
+```sh
+FM_CODEX_LIVE_E2E=1 bash bin/fm-test-run.sh tests/fm-codex-continuity-live-e2e.test.sh
+```
+
+Exact result:
+
+```text
+ok - codex-cli 0.161.0: foreground expiry, later synthetic gate delivery, and deep structural ancestry verified
+```
+
+The test inspects actual Codex command results, expires the first checkpoint, writes a synthetic decision status, then runs the next checkpoint and durable drain.
+It disables hooks for the lab worker and does not refresh Stop-hook evidence or claim an unattended callback after expiry.
+The gate and terminal daemon transitions are separately covered by `tests/fm-watch-checkpoint.test.sh` using real Git attribution and a CLI double, including an unchanged worker pane, absent usage, duplicate suppression, and presented-but-unacknowledged replay.
+`tests/fm-nm-recover.test.sh` uses real Git histories with a CLI double for a missing checkout, divergent caller, dirty tree, and repeated CLI-confirmed recovery; it does not prove that the installed upstream CLI can repair a lost checkout.
+`tests/fm-pipeline-spend.test.sh` exercises resumed cumulative counters, missing usage, repeated finding rounds, and increasing review scope through the supported summary executable.
 
 Pi 0.86.1 repeated the isolated watcher-only live check on 2026-09-22:
 

@@ -5688,3 +5688,53 @@ test_unverifiable_run_selection_reports_unknown
 test_legacy_conflicting_run_records_report_unknown
 
 echo "all fm-crew-state tests passed"
+
+# A current CLI custody blocker remains actionable even when the terminal
+# candidate and caller diverged. Bind the CLI's caller fields, not branch name
+# alone, so historical reused-branch runs cannot mint a custody obligation.
+test_terminal_custody_blocker_binds_exact_cli_caller() {
+  reset_fakes
+  local d head candidate out
+  d=$(new_case terminal-custody)
+  make_repo_on_branch "$d/wt" fm/custody
+  head=$FM_FAKE_RUN_HEAD
+  git -C "$d/wt" checkout -qb candidate
+  git -C "$d/wt" commit -q --allow-empty -m candidate
+  candidate=$(git -C "$d/wt" rev-parse HEAD)
+  git -C "$d/wt" checkout -q fm/custody
+  git -C "$d/wt" commit -q --allow-empty -m caller
+  head=$(git -C "$d/wt" rev-parse HEAD)
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/custody.meta" "worktree=$d/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex'
+  FM_FAKE_AXI_STATUS=$(cat <<EOF
+run:
+  id: RUN-CUSTODY
+  branch: fm/custody
+  status: failed
+  head: $candidate
+  head_sha: $candidate
+outcome: failed
+branch_sync:
+  state: blocked_diverged
+  local:
+    branch: fm/custody
+    head: $head
+  pipeline:
+    current_head: $candidate
+  next_action:
+    code: recover_custody
+    command: no-mistakes axi sync --recover
+EOF
+)
+  FM_FAKE_AXI_HOME=$(printf 'repo: %s\ncount: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  RUN-CUSTODY,fm/custody,failed,%s,\n' "$d/wt" "$candidate")
+  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  out=$(run_crew_state "$d" custody)
+  assert_contains "$out" 'state: blocked' "diverged terminal custody was silently lost"
+  assert_contains "$out" 'custody recovery: blocked_diverged' "custody refusal missing"
+  assert_contains "$out" 'run: RUN-CUSTODY' "custody blocker lost its run identity"
+  FM_FAKE_AXI_STATUS_RUN=${FM_FAKE_AXI_STATUS_RUN/    head: $head/    head: $candidate}
+  out=$(run_crew_state "$d" custody)
+  assert_not_contains "$out" 'custody recovery:' "historical caller head minted a current custody obligation"
+  pass "terminal custody blockers require the CLI's exact caller branch/head binding"
+}
+test_terminal_custody_blocker_binds_exact_cli_caller

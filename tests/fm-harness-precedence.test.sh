@@ -841,3 +841,23 @@ test_descent_probe_prefers_comm_strength_when_deepest_leaves_tie
 test_supervision_branch_resolves_the_primary_pin
 test_supervision_branch_refuses_an_unknown_primary_pin
 test_supervision_protocol_follows_corrected_verdict
+
+# Nested supervision helpers must still find the session that owns their process
+# tree. Keep a child alive at each level so bash cannot tail-exec the next one.
+deep="$TMP_ROOT/deep-probe.sh"
+cat > "$deep" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" -gt 0 ]; then
+  result=$(bash "$0" "$(( $1 - 1 ))" "$2")
+else
+  result=$("$2")
+fi
+printf '%s' "$result"
+SH
+chmod +x "$deep"
+owner=$(named_bin "$TMP_ROOT/deep-owner" codex)
+# shellcheck disable=SC2016 # the named owner expands its own positional arguments
+result=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  "$owner" -c 'result=$(bash "$1" 12 "$2"); printf "%s" "$result"' _ "$deep" "$HARNESS")
+[ "$result" = codex ] || fail "nested tool helpers lost their codex owner: $result"
+pass "nested tool helpers retain structural harness ancestry"

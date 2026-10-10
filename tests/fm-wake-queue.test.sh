@@ -2964,6 +2964,8 @@ test_wake_queue_prune_task() {
   append_wake "$state" signal "task-a.status" "signal: $state/task-a.status"
   append_wake "$state" signal "task-a.turn-ended" "signal: $state/task-a.turn-ended"
   append_wake "$state" check "$state/task-a.check.sh" "check: $state/task-a.check.sh: merged: https://example.test/pr/1"
+  append_wake "$state" check 'validation:task-a:123-4' 'check: validation task-a run=RUN1 state=parked'
+  append_wake "$state" check 'validation:task-a-longer:123-4' 'check: validation task-a-longer run=RUN2 state=failed'
   append_wake "$state" stale "test:window-b" "stale: test:window-b"
   append_wake "$state" signal "task-b.status" "signal: $state/task-b.status"
   append_wake "$state" check "$state/task-b.check.sh" "check: $state/task-b.check.sh: merged: https://example.test/pr/2"
@@ -2975,6 +2977,8 @@ test_wake_queue_prune_task() {
   grep -F 'task-a.status' "$queue" >/dev/null && fail "prune left status wake for task-a"
   grep -F 'task-a.turn-ended' "$queue" >/dev/null && fail "prune left turn-ended wake for task-a"
   grep -F 'task-a.check.sh' "$queue" >/dev/null && fail "prune left check wake for task-a"
+  grep -F 'validation:task-a:' "$queue" >/dev/null && fail "prune left validation wake for task-a"
+  grep -F 'validation:task-a-longer:' "$queue" >/dev/null || fail "prune removed another task's validation wake"
   grep -F 'test:window-b' "$queue" >/dev/null || fail "prune removed stale wake for task-b"
   grep -F 'task-b.status' "$queue" >/dev/null || fail "prune removed status wake for task-b"
   grep -F 'task-b.check.sh' "$queue" >/dev/null || fail "prune removed check wake for task-b"

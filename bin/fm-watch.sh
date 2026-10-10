@@ -113,6 +113,16 @@
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
 #                          inactive terminal outcome that still lacks its durable
 #                          upstream receipt
+#   check: validation <task> run=<id> step=<step> state=<state> ...
+#                          attributed no-mistakes gate or terminal transition,
+#                          independent of pane churn and worker reporting. The
+#                          poll runs every FM_NM_CHECK_INTERVAL (default 30s),
+#                          persists its task-incarnation/transition receipt only
+#                          after queue append, and reports CLI stats at that
+#                          boundary. Repeats are silent; interruption before the
+#                          receipt may redeliver the same durable event. This
+#                          requests supervisor attention only, never a response,
+#                          fix, or new validation run.
 #   check: secondmate wake-loop stalled: mate=<id> row=<seq> idle=<seconds>s
 #                          an actionable row in an endpoint-recorded local
 #                          secondmate home's durable wake queue did not advance
@@ -1978,6 +1988,65 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
   echo $(( now - m ))
 }
 
+# Validation transition delivery belongs to this existing poll loop, not a
+# separate daemon. A gate can park without changing the worker's pane or log.
+# shellcheck source=bin/fm-nm-run-lib.sh
+. "$SCRIPT_DIR/fm-nm-run-lib.sh"
+validation_transitions_tick() {
+  local interval=${FM_NM_CHECK_INTERVAL:-30} meta task snapshot identity receipt token previous
+  local run state step digest wt telemetry reason tmp existing queue_key
+  case "$interval" in ''|*[!0-9]*) interval=30 ;; esac
+  [ "$interval" -gt 0 ] 2>/dev/null || interval=30
+  [ "$(age_of "$STATE/.last-nm-check")" -ge "$interval" ] || return 0
+  command -v no-mistakes >/dev/null 2>&1 || return 0
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    [ "$(fm_meta_get "$meta" kind)" = ship ] || continue
+    [ "$(fm_meta_get "$meta" mode)" = no-mistakes ] || continue
+    task=${meta##*/}; task=${task%.meta}
+    snapshot=$("$SCRIPT_DIR/fm-crew-state.sh" "$task" --validation-snapshot 2>/dev/null) || continue
+    identity=$(fm_nm_transition_identity "$snapshot")
+    [ -n "$identity" ] || continue
+    IFS='|' read -r run state step digest <<EOF
+$identity
+EOF
+    token="$(fm_meta_get "$meta" spawn_gen)|$identity"
+    queue_key="validation:$task:$(printf '%s' "$token" | cksum | awk '{print $1 "-" $2}')"
+    receipt="$STATE/.nm-transition-$task"
+    previous=$(cat "$receipt" 2>/dev/null || true)
+    [ "$previous" != "$token" ] || continue
+    wt=$(fm_meta_get "$meta" worktree)
+    telemetry=$("$SCRIPT_DIR/fm-pipeline-spend.sh" show "$wt" "$run" 2>/dev/null) || telemetry=
+    telemetry=${telemetry:-telemetry: run=$run models=unknown invocations=unknown input=unknown cached=unknown output=unknown}
+    reason="check: validation $task run=$run step=$step state=$state transition=$digest; $telemetry; inspect the current gate/outcome; no automatic gate response"
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+    previous=$(cat "$receipt" 2>/dev/null || true)
+    if [ "$previous" = "$token" ]; then
+      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+      continue
+    fi
+    # Queue before receipt, under the queue's own lock. A crash between these
+    # writes reuses a still-queued identical transition instead of losing it.
+    existing=$(awk -F '\t' -v key="$queue_key" '$4 == key {print; exit}' "$FM_WAKE_QUEUE" 2>/dev/null || true)
+    if [ -z "$existing" ]; then
+      fm_wake_append_locked check "$queue_key" "$reason" || {
+        fm_lock_release "$FM_WAKE_QUEUE_LOCK"; return 1;
+      }
+    fi
+    tmp=$(mktemp "$STATE/.nm-transition-$task.XXXXXX") || {
+      fm_lock_release "$FM_WAKE_QUEUE_LOCK"; return 1;
+    }
+    if ! printf '%s\n' "$token" > "$tmp" || ! mv -f -- "$tmp" "$receipt"; then
+      rm -f -- "$tmp"
+      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+      return 1
+    fi
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    wake "$reason"
+  done
+  touch "$STATE/.last-nm-check"
+}
+
 # Layer 2 + 3 signal scan: status files and turn-end markers.
 # Each file is compared against its persisted reported signature in .seen-* rather
 # than mtime-vs-a-startup-touch, so signals that land while no watcher is running
@@ -2764,6 +2833,12 @@ while :; do
   # Then deliver any queued-but-unsurfaced result, including one a runner
   # published while this watcher was between cycles.
   procevent_surface_queued
+
+  # Validation transitions also carry richer context than generic recovery.
+  validation_transitions_tick || {
+    echo "watcher: validation transition could not be queued safely" >&2
+    exit 1
+  }
 
   # A process-event result carries richer adapter-owned wake context than the
   # generic recovery reason, so give that owner first refusal.

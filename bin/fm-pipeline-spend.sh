@@ -4,6 +4,11 @@
 #
 # Usage:
 #   fm-pipeline-spend.sh record <task-id>
+#   fm-pipeline-spend.sh show <worktree> <run-id>
+#
+# show reads the supported stats --run CLI and prints a bounded telemetry line.
+# It never records spend or changes custody and needs no recording opt-in.
+# The parser in bin/fm-nm-stats.py owns round-delta and unknown accounting.
 #
 # record appends the task's pipeline spend as one JSON object on one line of
 # data/pipeline-spend.jsonl, at most once per task incarnation (task id plus
@@ -97,6 +102,16 @@ fail() {
   printf 'fm-pipeline-spend: %s\n' "$*" >&2
   exit 1
 }
+
+if [ "${1:-}" = show ]; then
+  [ "$#" -eq 3 ] || { usage >&2; exit 2; }
+  case "$3" in ''|*[!a-zA-Z0-9_-]*) fail "invalid run id" ;; esac
+  stats_file=$(mktemp "${TMPDIR:-/tmp}/fm-nm-stats.XXXXXX") || exit 1
+  trap 'rm -f -- "$stats_file"' EXIT
+  fm_nm_run_checked "$2" 10 stats --run "$3" > "$stats_file" || : > "$stats_file"
+  python3 "$SCRIPT_DIR/fm-nm-stats.py" "$3" "$stats_file"
+  exit
+fi
 
 case "${1:-}" in
   -h|--help) usage; exit 0 ;;

@@ -39,6 +39,9 @@
 #      active or terminal (from `axi status`, or the coarse `no-mistakes runs`
 #      fallback)? Branch name alone is not enough: a historical run on a reused
 #      branch whose head was rewritten or diverged must not be attributed.
+#      A selected terminal custody blocker instead binds the CLI's exact
+#      caller branch and full HEAD, reports blocked, and preserves that
+#      obligation even when the terminal candidate diverged.
 #      A run EXECUTING on this crew's branch (pending, running, fixing or ci -
 #      the detail-object vocabulary, which carries all four; the selected route
 #      re-reads it by id and the legacy route passes the same detail SHAPE, and
@@ -160,6 +163,8 @@
 #
 # Read-only and side-effect free. Always exits 0 on a successful read regardless
 # of state; exit 2 only on a usage error (no id).
+# --validation-snapshot appends the attributed CLI status to a state/source line
+# for the watcher transition check; coarse or unverified reads carry no snapshot.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -185,6 +190,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 
 ID=${1:-}
+VALIDATION_SNAPSHOT=0
+[ "${2:-}" != --validation-snapshot ] || VALIDATION_SNAPSHOT=1
 [ -n "$ID" ] || { echo "usage: fm-crew-state.sh <id>" >&2; exit 2; }
 
 # Fleet snapshot composition supplies its captured metadata path here so every
@@ -966,6 +973,13 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
         if [ "$(fm_nm_run_status_class "$selected_status")" != "$current_class" ]; then
           emit unknown run-step "selected run status disagrees with inventory; run ids: $candidate_ids"
         fi
+        if fm_nm_terminal_custody_blocks "$RUN_OUT" "$WT"; then
+          if [ "$VALIDATION_SNAPSHOT" = 1 ]; then
+            printf 'state: blocked%s source: run-step\n%s\n' "$SEP" "$RUN_OUT"
+            exit 0
+          fi
+          emit blocked run-step "custody recovery: $(fm_nm_branch_sync_state "$RUN_OUT")${SEP}run: $selected_id"
+        fi
         if nm_run_head_matches_worktree || fm_nm_run_is_pipeline_owned_active "$RUN_OUT" \
           || { fm_nm_run_is_executing "$RUN_OUT" && ! nm_daemon_answered_down; }; then
           HAVE_RUN=1
@@ -1222,6 +1236,11 @@ if [ "$HAVE_RUN" = 1 ]; then
   esac
 
   [ -z "$SELECTED_RUN_ID" ] || RUN_DETAIL="$RUN_DETAIL${SEP}run: $SELECTED_RUN_ID"
+  if [ "$VALIDATION_SNAPSHOT" = 1 ] && [ "$RUN_SOURCE" != coarse ] && [ -z "$RUN_DEAD_DAEMON" ]; then
+    printf 'state: %s%s source: run-step\n' "$RUN_STATE" "$SEP"
+    printf '%s\n' "$RUN_OUT"
+    exit 0
+  fi
   emit "$RUN_STATE" run-step "$RUN_DETAIL"
 fi
 

@@ -1,6 +1,6 @@
 ---
 name: validation-supervision
-description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, and before deciding or answering any ask-user finding.
+description: Load when a ship starts or already has an active no-mistakes validation run, on a validation transition wake, and before deciding or answering any ask-user finding.
 user-invocable: false
 metadata:
   internal: true
@@ -16,7 +16,7 @@ Once validation starts, prefer routing new requirements to follow-up work rather
 
 Only a current, explicit captain instruction that completely invalidates the work being validated keeps the task with the same worker instead of routing it to follow-up work or handing it to a replacement.
 That worker cancels the active run through no-mistakes axi's supported abort command and confirms through axi status that the run has stopped before changing any code.
-The worker then follows `branch_sync.next_action` from structured axi status: use axi sync's supported guarded recovery only when its code is `recover_custody`, and otherwise proceed only when structured status confirms that branch ownership is already returned and no recovery is required.
+The worker then follows `branch_sync.next_action` from structured axi status through the guarded CLI-only boundary in [`bin/fm-nm-recover.sh`](../../../bin/fm-nm-recover.sh); a refusal requires preserving its evidence handoff for supervisor or upstream resolution.
 Custody recovery settles branch ownership, not content: the worker must replace the obsolete work from the correct pre-invalidation base rather than building on top of the recovered-but-obsolete head, keeping the obsolete run's own pipeline-fix commits out of what gets validated and shipped.
 Apart from that single supported abort, do not hand-edit, commit, restart, or start a second validation run while the obsolete run still owns the branch.
 Once ownership is settled, validate exactly once against that final head so no obsolete or intermediate head is ever treated as authoritative.
@@ -27,6 +27,7 @@ Require the matching `resolved` event, forbid `--yes`, and require the worker to
 Resume fleet supervision immediately after the decision lands.
 
 Judge validation by the resolved state line from [`bin/fm-crew-state.sh`](../../../bin/fm-crew-state.sh), whose header owns outcome mappings and CI-monitor/daemon exceptions, never by shell liveness, the last status event, or a raw run record.
+On `check: validation`, inspect the named run's current gate or outcome before acting; telemetry and attention signals are context under [`watcher-continuity.md`](../../../docs/watcher-continuity.md#validation-gates-and-terminal-custody), never authority to answer findings, auto-fix work, or waive a gate.
 Workers parked at approval or fix-review must follow the active gate help.
 A worker hand-editing, committing, aborting, or restarting during an active validation run duplicates pipeline ownership outside the supersession sequence above; steer it back to the gate response flow.
 The worker reports the PR when CI first becomes green rather than waiting for merge monitoring to finish.

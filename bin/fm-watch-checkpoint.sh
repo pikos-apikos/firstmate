@@ -14,8 +14,11 @@
 # so a parked main is not woken every few minutes; an engine turn that starts
 # before the bound may finish after it. A close that carries a wake or a
 # "supervision-host:" line other than the park boundary passes through as a
-# wake; the boundary alone is the ordinary quiet checkpoint. On a home that
-# does not run the host nothing below changes.
+# wake; the boundary alone is the ordinary quiet checkpoint.
+# A non-host checkpoint returns an already-queued main wake immediately rather
+# than spending its bound on work the supervisor has not acknowledged. It never
+# consumes or acknowledges those rows. Quiet expiry explicitly requires the
+# caller to continue: it leaves no watcher and promises no unattended callback.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,6 +35,8 @@ Usage: fm-watch-checkpoint.sh [--seconds <n>]
 Run bin/fm-watch.sh in the foreground for a bounded checkpoint.
 On an actionable watcher wake, pass through the watcher output and exit 0.
 On a quiet checkpoint, print "checkpoint: no actionable wake within <n>s" and exit 124.
+Quiet expiry leaves no watcher or unattended callback; continue the emitted protocol.
+Already-queued main wakes return immediately for drain and acknowledgement.
 EOF
 }
 
@@ -140,6 +145,7 @@ if fm_supervision_host_enabled "$CONFIG" codex; then
   fi
   if grep -E '^supervision-host: cycle boundary' "$OUT" >/dev/null 2>&1; then
     printf 'checkpoint: no actionable wake within %ss\n' "$BOUND"
+    echo 'continuation-required: checkpoint expired; drain queued wakes and start the next foreground checkpoint; no unattended callback is armed'
     exit 124
   fi
   [ ! -s "$OUT" ] || cat "$OUT"
@@ -150,6 +156,13 @@ if fm_supervision_host_enabled "$CONFIG" codex; then
   fi
   [ "$RC" -ne 0 ] || RC=1
   exit "$RC"
+fi
+
+# shellcheck source=bin/fm-wake-lib.sh
+. "$SCRIPT_DIR/fm-wake-lib.sh"
+if [ "$(fm_wake_actor_pending_count main)" -gt 0 ]; then
+  echo 'check: pending durable wakes; run bin/fm-wake-drain.sh and handle/acknowledge them before another checkpoint'
+  exit 0
 fi
 
 set +e
@@ -172,6 +185,7 @@ fi
 
 if [ "$RC" -eq 124 ]; then
   printf 'checkpoint: no actionable wake within %ss\n' "$SECONDS_ARG"
+  echo 'continuation-required: checkpoint expired; drain queued wakes and start the next foreground checkpoint; no watcher or unattended callback remains'
   exit 124
 fi
 

@@ -638,6 +638,34 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
 
+## Primary ancestry through helper chains
+
+Verified on 2026-10-10 on Linux with Herdr 0.9.0, protocol 22, using a named isolated session through `bin/fm-herdr-lab.sh`.
+The token-free guard starts each installed primary without submitting a prompt and reads Herdr's foreground process IDs before asking `bin/fm-harness.sh` for structural ancestry.
+
+```sh
+bash bin/fm-test-run.sh tests/fm-harness-precedence.test.sh
+bash bin/fm-test-run.sh tests/fm-harness-ancestry-herdr-live-e2e.test.sh
+```
+
+The portable regression reaches a renamed native Codex process through twelve retained shell parents; the classifier walks a bounded ancestry chain instead of stopping before that process.
+Live output:
+
+```text
+ok - real claude (2.1.282 (Claude Code)): structural ancestry=claude
+ok - real codex (codex-cli 0.161.0): structural ancestry=codex
+ok - real opencode (opencode v2.0.22): structural ancestry=opencode
+ok - real pi (1.1.0): structural ancestry=pi
+# absent: pi-signed; not verified on this host
+# absent: grok; not verified on this host
+# absent: cursor; not verified on this host
+# absent: omp; not verified on this host
+# checked 4 installed primary harnesses; teardown verifies the unchanged default-session tripwire
+```
+
+This refreshes process ancestry only; the absent primary harnesses and other vendor lifecycle signals retain their separately dated evidence.
+Herdr teardown checks that the running default session remains unchanged.
+
 ## Codex hook trust
 
 Verified 2026-09-16 on codex-cli 0.151.0, macOS arm64, in a fresh linked worktree of this repository.
