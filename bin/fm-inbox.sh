@@ -198,6 +198,7 @@ ANNOUNCED_DIR="$INBOX/.announced"
 REPLIES="$INBOX/.replies"
 
 REPLY_SEQ_LOCK="$INBOX/.replies.lock"
+INBOX_MUTATION_LOCK="$INBOX/.mutation.lock"
 
 RECEIPTS_PENDING_BOUND=20
 RECEIPTS_HANDLED_BOUND=20
@@ -254,6 +255,16 @@ note_announced() {  # <id>
 mark_announced() {  # <id>
   mkdir -p "$ANNOUNCED_DIR"
   printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$ANNOUNCED_DIR/$1"
+}
+
+inbox_mutation_lock_acquire() {
+  mkdir -p "$INBOX" || return 1
+  load_wake_lib || return 2
+  fm_lock_acquire_wait "$INBOX_MUTATION_LOCK"
+}
+
+inbox_mutation_lock_release() {
+  fm_lock_release "$INBOX_MUTATION_LOCK"
 }
 
 # true | false | unknown, for the note recorded at <path>.
@@ -333,7 +344,7 @@ PY
 #
 # Returns 2 without waking when the note is no longer pending: firstmate has
 # already acknowledged it, so a wake would only spend a turn on an empty inbox.
-announce_note() {  # <id> <summary>
+announce_note_locked() {  # <id> <summary>; caller holds INBOX_MUTATION_LOCK
   local id=$1 summary=$2 lib="$FM_ROOT/bin/fm-wake-lib.sh" status=0
   if note_announced "$id"; then
     return 0
@@ -362,10 +373,18 @@ announce_note() {  # <id> <summary>
   return "$status"
 }
 
+announce_note() {  # <id> <summary>
+  inbox_mutation_lock_acquire || return 1
+  local status=0
+  announce_note_locked "$@" || status=$?
+  inbox_mutation_lock_release || status=1
+  return "$status"
+}
+
 finish_note_result() {  # <outcome> <id> <request-id> <json> <strict-exit> <summary>
   local outcome=$1 id=$2 request_id=$3 json=$4 strict=$5 summary=$6
   local announced=0 acknowledged=0 path="$INBOX/$id.note" rc=0
-  announce_note "$id" "$summary" || rc=$?
+  announce_note_locked "$id" "$summary" || rc=$?
   case "$rc" in
     0) announced=1 ;;
     2) acknowledged=1 ;;
@@ -422,7 +441,7 @@ publish_from_reservation() {  # <request-id> <source> <body> <extra>
   printf '%s\n' "$id"
 }
 
-queue_note() {
+queue_note_locked() {
   local source=$1 body=$2 extra=${3:-} request_id=${4:-} json=${5:-0}
   local strict=0
   if [ -n "$request_id" ] || [ "$json" -eq 1 ]; then
@@ -467,6 +486,19 @@ queue_note() {
   mv "$tmp" "$INBOX/$id.note"
   summary=$(note_summary_from_body "$body")
   finish_note_result created "$id" "" "$json" "$strict" "$summary"
+}
+
+queue_note() {
+  local lock_status=0 status=0
+  inbox_mutation_lock_acquire || lock_status=$?
+  if [ "$lock_status" -eq 2 ]; then
+    queue_note_locked "$@"
+    return $?
+  fi
+  [ "$lock_status" -eq 0 ] || die "could not lock inbox publication"
+  queue_note_locked "$@" || status=$?
+  inbox_mutation_lock_release || status=1
+  return "$status"
 }
 
 cmd_note() {
@@ -1117,6 +1149,7 @@ cmd_drain() {
   if [ "${1:-}" = "--ack" ]; then
     shift
     [ "$#" -gt 0 ] || die "usage: fm-inbox.sh drain --ack <id>..."
+    inbox_mutation_lock_acquire || die "could not lock inbox acknowledgement"
     mkdir -p "$INBOX/handled"
     local id
     for id in "$@"; do
@@ -1127,6 +1160,7 @@ cmd_drain() {
         printf 'already-acked %s\n' "$id"
       fi
     done
+    inbox_mutation_lock_release || die "could not release inbox acknowledgement lock"
     return 0
   fi
   cmd_list

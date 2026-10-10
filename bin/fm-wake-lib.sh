@@ -720,7 +720,9 @@ _fm_recovery_marker_publish() {
     FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
   fi
   lock="${marker}.lock"
-  if [ -n "$bound" ]; then
+  if [ "$source" = append ] && [ -n "${FM_WAKE_APPEND_DEADLINE:-}" ]; then
+    _fm_wake_append_marker_lock_acquire "$lock" || return 1
+  elif [ -n "$bound" ]; then
     fm_lock_acquire_wait_max "$lock" "$bound" || return 1
   else
     fm_lock_acquire_wait "$lock" || return 1
@@ -782,7 +784,11 @@ _fm_wake_append_recovery_restore_locked() {
   local marker="$STATE/.watcher-down" lock previous=$FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN
   [ -n "$previous" ] || return 0
   lock="${marker}.lock"
-  fm_lock_acquire_wait "$lock" || return 1
+  if [ -n "${FM_WAKE_APPEND_DEADLINE:-}" ]; then
+    _fm_wake_append_marker_lock_acquire "$lock" || return 1
+  else
+    fm_lock_acquire_wait "$lock" || return 1
+  fi
   if ! fm_recovery_marker_read "$marker" \
     || [ "$FM_RECOVERY_MARKER_TOKEN" != "$FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN" ]; then
     fm_lock_release "$lock"
@@ -2134,6 +2140,28 @@ fm_wake_append() {
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
   fm_wake_append_locked "$@" || status=$?
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$status"
+}
+
+_fm_wake_append_marker_lock_acquire() {  # <lockdir>
+  local remaining
+  remaining=$((FM_WAKE_APPEND_DEADLINE - SECONDS))
+  if [ "$remaining" -gt 0 ]; then
+    fm_lock_acquire_wait_bounded "$1" "$remaining"
+  else
+    fm_lock_try_acquire "$1"
+  fi
+}
+
+fm_wake_append_bounded() {  # <seconds> <kind> <key> <payload>
+  local seconds=$1 deadline status=0
+  shift
+  case "$seconds" in ''|*[!0-9]*|0) return 2 ;; esac
+  deadline=$((SECONDS + seconds))
+  fm_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" "$seconds" || return $?
+  local FM_WAKE_APPEND_DEADLINE=$deadline
+  fm_wake_append_locked "$@" || status=$?
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK" || status=1
   return "$status"
 }
 

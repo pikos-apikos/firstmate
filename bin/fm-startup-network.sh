@@ -356,9 +356,12 @@ report_requires_wake() {  # <state>
     "$REPORT_FILE" 2>/dev/null
 }
 
-queue_result_wake() {  # <state>
-  fm_wake_append check startup-network \
-    "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
+queue_result_wake() {  # <state> <deadline>
+  local state=$1 deadline=$2 remaining
+  remaining=$(( deadline - $(now) ))
+  [ "$remaining" -gt 0 ] || return 1
+  fm_wake_append_bounded "$remaining" check startup-network \
+    "check: startup-network: deferred startup network checks finished ($state); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
     || true
 }
 
@@ -373,7 +376,7 @@ await_delivery() {  # <generation> <state>
       # A live holder outlived the whole delivery budget, so the claim cannot be
       # judged under the lock. A possible duplicate of an inline print is
       # cheaper than an actionable result nobody is woken for.
-      ! report_requires_wake "$state" || queue_result_wake "$state"
+      ! report_requires_wake "$state" || queue_result_wake "$state" "$DELIVERY_DEADLINE"
       return 1
     fi
     if [ "$(status_get generation)" != "$generation" ]; then
@@ -398,7 +401,7 @@ EOF
       [ "$claim_live" -eq 1 ] || rm -f "$CLAIM_FILE" 2>/dev/null || true
     fi
     if [ "$claim_live" -eq 0 ]; then
-      ! report_requires_wake "$state" || queue_result_wake "$state"
+      ! report_requires_wake "$state" || queue_result_wake "$state" "$DELIVERY_DEADLINE"
       fm_lock_release "$PUBLISH_LOCK"
       return 0
     fi
@@ -444,7 +447,7 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
   local generation=$1 state=$2 phases=$3 locked=$4 started=$5 rc=$6 out=$7 timings=${8:-}
   DELIVERY_DEADLINE=$(( $(now) + $(delivery_budget) ))
   if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
-    publish_lock_held "$generation" "$phases" "$locked" "$started" "$PUBLISH_LOCK" "$out" "$timings"
+    publish_lock_held "$generation" "$phases" "$locked" "$started" "$PUBLISH_LOCK" "$out" "$timings" "$DELIVERY_DEADLINE"
     return 1
   fi
   if [ "$(status_get generation)" != "$generation" ]; then
@@ -465,8 +468,8 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
 # locked path applies. A wake is queued unconditionally because the claim
 # cannot be judged without the lock; a duplicate of an inline print is cheaper
 # than a failure nobody is woken for.
-publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <output-file> <timing-file>
-  local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-}
+publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <output-file> <timing-file> <deadline>
+  local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-} deadline=$8
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/fm-startup-network.sh run --locked %s once that lock is released\n' \
     "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
   if [ "$(status_get generation)" != "$generation" ] \
@@ -474,7 +477,7 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
     return 1
   fi
   record_result "$generation" failed "$phases" "$locked" "$started" 124 "$out" "$timings" >/dev/null
-  queue_result_wake failed
+  queue_result_wake failed "$deadline"
 }
 
 cmd_run() {  # <locked> <lock-pid> <generation>
@@ -496,7 +499,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
   [ -z "$timings" ] || fm_timing_start "$timings"
   if [ -n "$generation" ]; then
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$stage_deadline")"; then
-      publish_lock_held "$generation" "$phases" "$locked" "$started" "$PUBLISH_LOCK" "$out" "$timings"
+      publish_lock_held "$generation" "$phases" "$locked" "$started" "$PUBLISH_LOCK" "$out" "$timings" "$stage_deadline"
       run_cleanup "$out" "$timings"
       return 1
     fi
@@ -523,7 +526,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
   if [ "$internal" -eq 0 ]; then
     generation="$(now).$$.manual"
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$stage_deadline")"; then
-      publish_lock_held "$generation" "$phases" "$sweep_locked" "$started" "$PUBLISH_LOCK" "$out" "$timings"
+      publish_lock_held "$generation" "$phases" "$sweep_locked" "$started" "$PUBLISH_LOCK" "$out" "$timings" "$stage_deadline"
       run_cleanup "$out" "$timings"
       return 1
     fi

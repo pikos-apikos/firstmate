@@ -513,12 +513,10 @@ test_branch_outcomes_put_captain_first_and_collapse_routine_overflow() {
   pass "drain: captain outcomes come first, and routine overflow collapses into a count one drain clears"
 }
 
-# Repeated captain outcomes for one task collapse to its newest, one line per
-# task; when the byte cap holds rows back, the section shows only the oldest
-# contiguous run its acknowledgement covers - a shown task's newer row that
-# follows a held-back one waits too, so no presented situation repeats - and
-# the next drain shows the rest.
-test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
+# Repeated captain outcomes from one reporting task remain distinct; when the
+# byte cap holds rows back, the section shows only the oldest contiguous run
+# its acknowledgement covers and the next drain shows the rest.
+test_branch_outcomes_preserve_repeated_captain_rows() {
   local home drained pad n task
   home="$TMP_ROOT/drain-collapse"
   mkdir -p "$home/state" "$home/config"
@@ -530,8 +528,10 @@ test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task beta --verdict captain --summary 'beta ready to merge' >/dev/null \
     || fail "fixture: could not record the beta outcome"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
-  assert_contains "$drained" "[seq 3, newest of 3 for this task, recorded 0m ago] alpha: alpha still blocked 3" "repeated outcomes for one task must collapse to its newest"
-  assert_not_contains "$drained" "alpha still blocked 1" "an older outcome for the same task must not be repeated"
+  assert_contains "$drained" "[seq 1, recorded 0m ago] alpha: alpha still blocked 1" "the first completion from one reporting task must be preserved"
+  assert_contains "$drained" "[seq 2, recorded 0m ago] alpha: alpha still blocked 2" "the second completion from one reporting task must be preserved"
+  assert_contains "$drained" "[seq 3, recorded 0m ago] alpha: alpha still blocked 3" "the latest completion from one reporting task must be preserved"
+  [ "$(printf '%s\n' "$drained" | grep -c '] alpha: ')" -eq 3 ] || fail "all three reported completions must get separate rows: $drained"
   assert_contains "$drained" "[seq 4, recorded 0m ago] beta: beta ready to merge" "another task's outcome must keep its own line"
   assert_contains "$drained" "mark-processed --through 4;" "one acknowledgement must cover every presented task"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 4 >/dev/null 2>&1 || fail "the acknowledgement was refused"
@@ -547,25 +547,25 @@ test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES: 3 newer captain outcome(s) are held back (byte cap); they follow on the next drain once these are acknowledged" \
     "the section must count every held-back captain row"
-  assert_contains "$drained" "[seq 5, recorded 0m ago] task-1: task-1 $pad" "the first task must show its newest outcome the acknowledgement covers"
+  assert_contains "$drained" "[seq 5, recorded 0m ago] task-1: task-1 $pad" "the first task's first row must fit the contiguous acknowledgement prefix"
   assert_not_contains "$drained" "task-1 changed again" "a row after a held-back one must wait, since the acknowledgement cannot cover it"
   assert_not_contains "$drained" "task-7:" "the cap must hold back the rows past the contiguous run"
   assert_contains "$drained" "mark-processed --through 10;" "the acknowledgement must cover exactly the presented run"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 10 >/dev/null 2>&1 || fail "the acknowledgement was refused"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
-  assert_contains "$drained" "task-8: task-8" "a held-back task must follow once the shown tasks are acknowledged"
-  assert_contains "$drained" "[seq 13, recorded 0m ago] task-1: task-1 changed again" "the held-back row of a shown task must follow once the run is acknowledged"
+  assert_contains "$drained" "task-8: task-8" "a held-back task must follow once the shown rows are acknowledged"
+  assert_contains "$drained" "[seq 13, recorded 0m ago] task-1: task-1 changed again" "a held-back row for an already shown task must follow once the prefix is acknowledged"
   assert_not_contains "$drained" "held back" "the rest must fit once the run is acknowledged"
   assert_contains "$drained" "mark-processed --through 13;" "the acknowledgement must cover the rest"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 13 >/dev/null 2>&1 || fail "the acknowledgement was refused"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "an acknowledged situation must not be presented again"
-  pass "drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers"
+  pass "drain: repeated captain rows stay distinct, and the byte cap acknowledges only its visible prefix"
 }
 
 # The reference experience after a long away window: the drain is the only
 # presenter, so the first drain once the away record is gone shows the window
-# once - each task's captain outcomes collapsed to one line, routine ones past
+# once - each captain outcome stays distinct, routine ones past
 # the section's limit as a count - and once main acknowledges them, a second
 # drain shows nothing from the window.
 test_branch_outcomes_present_a_long_away_window_once() {
@@ -592,8 +592,10 @@ test_branch_outcomes_present_a_long_away_window_once() {
   FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
 
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
-  assert_contains "$drained" "[seq 33, newest of 3 for this task, recorded 0m ago] alpha: alpha still needs review 30" "a task's repeated captain outcomes must collapse to its newest"
-  [ "$(printf '%s\n' "$drained" | grep -c '] alpha: ')" -eq 1 ] || fail "a task's captain outcomes must take one line: $drained"
+  assert_contains "$drained" "[seq 11, recorded 0m ago] alpha: alpha still needs review 10" "the first captain outcome in the window must remain distinct"
+  assert_contains "$drained" "[seq 22, recorded 0m ago] alpha: alpha still needs review 20" "the second captain outcome in the window must remain distinct"
+  assert_contains "$drained" "[seq 33, recorded 0m ago] alpha: alpha still needs review 30" "the third captain outcome in the window must remain distinct"
+  [ "$(printf '%s\n' "$drained" | grep -c '] alpha: ')" -eq 3 ] || fail "the window's three captain outcomes must each keep a line: $drained"
   assert_contains "$drained" "[seq 44, recorded 0m ago] beta: beta ready to merge" "another task's captain outcome must keep its own line"
   assert_re '^\([0-9]+ earlier routine outcome\(s\) not shown; bin/fm-branch-outcome.sh list keeps them\)$' <(printf '%s\n' "$drained") \
     "the window's routine overflow must collapse into one count"
@@ -606,7 +608,7 @@ test_branch_outcomes_present_a_long_away_window_once() {
 
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a second drain must show nothing from the window"
-  pass "drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again"
+  pass "drain: a long away window preserves distinct captain outcomes, counts routine overflow, and clears after acknowledgement"
 }
 
 # The section's budgets count bytes: a multibyte summary is cut by whole
@@ -648,14 +650,15 @@ test_branch_outcomes_stay_unread_when_a_projection_fails() {
   home="$TMP_ROOT/drain-projection"
   mkdir -p "$home/state" "$home/config" "$home/bin"
   : > "$home/config/supervision-host"
-  printf '#!/usr/bin/env bash\ncase "$*" in *"newest of"*) exit 5 ;; esac\nexec %q "$@"\n' "$(command -v jq)" > "$home/bin/jq"
+  printf '#!/usr/bin/env bash\nlast_arg=${!#}\nif [[ "$last_arg" != *.jsonl ]] && [ ! -e "$FM_JQ_FAIL_MARKER" ]; then : > "$FM_JQ_FAIL_MARKER"; exit 5; fi\nexec %q "$@"\n' "$(command -v jq)" > "$home/bin/jq"
   chmod +x "$home/bin/jq"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task cap --verdict captain --summary 'needs your merge call' >/dev/null \
     || fail "fixture: could not record the captain outcome"
   rc=0
-  drained=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh") || rc=$?
+  drained=$(PATH="$home/bin:$PATH" FM_HOME="$home" FM_JQ_FAIL_MARKER="$home/projection-failed" \
+    "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh") || rc=$?
   [ "$rc" -ne 0 ] || fail "a drain whose projection failed must exit nonzero: $drained"
   assert_contains "$drained" "BRANCH OUTCOMES SKIPPED: the outcome store could not be projected safely" \
     "a failed projection must be reported"
@@ -763,7 +766,8 @@ test_branch_ack_keeps_older_keyed_decision_open() {
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_contains "$drained" 'OPEN DECISIONS' "the status decision must appear in the first drain"
   assert_contains "$drained" 'held [key=merge-153] needs-decision: merge PR 153 now or hold?' "the older decision must remain open"
-  assert_contains "$drained" '[seq 2, newest of 2 for this task' "the branch line must collapse to the newest outcome"
+  assert_contains "$drained" '[seq 1, recorded 0m ago] held: needs merge decision' "the first branch outcome must remain separately visible"
+  assert_contains "$drained" '[seq 2, recorded 0m ago] held: CI is now green' "the later branch outcome must remain separately visible"
   assert_contains "$drained" "including its still-open decisions listed above under OPEN DECISIONS" "the check-first instruction must include the older keyed decision"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 2 >/dev/null || fail "fixture: acknowledgement refused"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
@@ -2963,7 +2967,7 @@ test_report_after_the_return_is_queued_for_main
 test_dispatch_entry_scopes_rows_and_renders_the_away_tail
 test_branch_outcomes_only_on_a_host_home_off_pi
 test_branch_outcomes_put_captain_first_and_collapse_routine_overflow
-test_branch_outcomes_collapse_repeated_captain_outcomes_per_task
+test_branch_outcomes_preserve_repeated_captain_rows
 test_branch_outcomes_present_a_long_away_window_once
 test_branch_outcomes_budgets_count_bytes
 test_branch_outcomes_stay_unread_when_a_projection_fails

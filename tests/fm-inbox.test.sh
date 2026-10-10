@@ -236,6 +236,52 @@ assert_equals "0" "$(count_wakes "$home")" \
   "an acknowledged note never gets a repair wake"
 pass "repair and replay do not wake firstmate for an already-acknowledged note"
 
+home=$(make_home concurrent-replay-ack)
+race_bin="$home/fakebin"
+mkdir -p "$race_bin"
+real_mv=$(command -v mv)
+cat > "$race_bin/mv" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_INBOX_BLOCK_PUBLISH:-0}" = 1 ] \
+  && [ "$#" -eq 2 ] \
+  && [[ "$1" == "$FM_INBOX_RACE_DIR"/.staging-* ]] \
+  && [[ "$2" == "$FM_INBOX_RACE_DIR"/*.note ]] \
+  && [ ! -e "$FM_INBOX_RACE_DIR/block-started" ]; then
+  : > "$FM_INBOX_RACE_DIR/block-started"
+  while [ ! -e "$FM_INBOX_RACE_DIR/release-publish" ]; do sleep 0.05; done
+fi
+exec "$FM_TEST_REAL_MV" "$@"
+SH
+chmod +x "$race_bin/mv"
+FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_REAL_MV="$real_mv" \
+  FM_INBOX_RACE_DIR="$home/state/inbox" FM_INBOX_BLOCK_PUBLISH=1 PATH="$race_bin:$PATH" \
+  "$INBOX_BIN" note --request-id race-1 --json "complete this durable note" > "$home/first.json" 2> "$home/first.err" &
+first_pid=$!
+for _ in $(seq 1 100); do
+  [ -e "$home/state/inbox/block-started" ] && break
+  sleep 0.05
+done
+[ -e "$home/state/inbox/block-started" ] || fail "first publisher never reached its pending-note rename"
+FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_REAL_MV="$real_mv" \
+  FM_INBOX_RACE_DIR="$home/state/inbox" PATH="$race_bin:$PATH" \
+  "$INBOX_BIN" note --request-id race-1 --json "complete this durable note" > "$home/retry.json" 2> "$home/retry.err" &
+retry_pid=$!
+sleep 0.3
+FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_REAL_MV="$real_mv" \
+  FM_INBOX_RACE_DIR="$home/state/inbox" PATH="$race_bin:$PATH" \
+  "$INBOX_BIN" drain --ack "$(cat "$home/state/inbox/.requests/race-1")" > "$home/ack.out" 2> "$home/ack.err" &
+ack_pid=$!
+sleep 0.2
+: > "$home/state/inbox/release-publish"
+wait "$first_pid" || fail "the first publisher failed: $(cat "$home/first.err")"
+wait "$retry_pid" || fail "the concurrent retry failed: $(cat "$home/retry.err")"
+wait "$ack_pid" || fail "the concurrent acknowledgement failed: $(cat "$home/ack.err")"
+race_id=$(cat "$home/state/inbox/.requests/race-1")
+assert_present "$home/state/inbox/handled/$race_id.note" "the concurrent acknowledgement must leave the note handled"
+assert_absent "$home/state/inbox/$race_id.note" "the concurrent retry must not resurrect a handled note"
+assert_equals "0" "$(count_notes "$home")" "a later inbox drain must not expose the acknowledged retry"
+pass "concurrent request replay and acknowledgement cannot resurrect a handled note"
+
 # --- bounded receipts JSON, omission disclosure, reply cursor ---------------
 
 json_len() {  # <key>
