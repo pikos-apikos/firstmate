@@ -1994,57 +1994,91 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
 validation_transitions_tick() {
   local interval=${FM_NM_CHECK_INTERVAL:-30} meta task snapshot identity receipt token previous
-  local run state step digest wt telemetry reason tmp existing queue_key
+  local run state step digest wt telemetry reason tmp existing queue_key cursor selected selected_task
   case "$interval" in ''|*[!0-9]*) interval=30 ;; esac
   [ "$interval" -gt 0 ] 2>/dev/null || interval=30
   [ "$(age_of "$STATE/.last-nm-check")" -ge "$interval" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
+  cursor=$(cat "$STATE/.nm-check-cursor" 2>/dev/null || true)
+  selected=
+  selected_task=
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     [ "$(fm_meta_get "$meta" kind)" = ship ] || continue
     [ "$(fm_meta_get "$meta" mode)" = no-mistakes ] || continue
     task=${meta##*/}; task=${task%.meta}
-    snapshot=$("$SCRIPT_DIR/fm-crew-state.sh" "$task" --validation-snapshot 2>/dev/null) || continue
-    identity=$(fm_nm_transition_identity "$snapshot")
-    [ -n "$identity" ] || continue
-    IFS='|' read -r run state step digest <<EOF
+    if [ -z "$selected" ]; then
+      if [ -z "$cursor" ] || [[ "$task" > "$cursor" ]]; then
+        selected=$meta
+        selected_task=$task
+      fi
+    fi
+  done
+  if [ -z "$selected" ] && [ -n "$cursor" ]; then
+    for meta in "$STATE"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      [ "$(fm_meta_get "$meta" kind)" = ship ] || continue
+      [ "$(fm_meta_get "$meta" mode)" = no-mistakes ] || continue
+      selected=$meta
+      selected_task=${meta##*/}; selected_task=${selected_task%.meta}
+      break
+    done
+  fi
+  if [ -z "$selected" ]; then
+    rm -f -- "$STATE/.nm-check-cursor"
+    touch "$STATE/.last-nm-check"
+    return 0
+  fi
+  meta=$selected
+  task=$selected_task
+  snapshot=$("$SCRIPT_DIR/fm-crew-state.sh" "$task" --validation-snapshot 2>/dev/null) || snapshot=
+  tmp=$(mktemp "$STATE/.nm-check-cursor.XXXXXX") || return 1
+  if ! printf '%s\n' "$task" > "$tmp" || ! mv -f -- "$tmp" "$STATE/.nm-check-cursor"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+  if [ -n "$cursor" ] && [[ "$task" < "$cursor" ]]; then
+    touch "$STATE/.last-nm-check"
+  fi
+  [ -n "$snapshot" ] || return 0
+  identity=$(fm_nm_transition_identity "$snapshot")
+  [ -n "$identity" ] || return 0
+  IFS='|' read -r run state step digest <<EOF
 $identity
 EOF
-    token="$(fm_meta_get "$meta" spawn_gen)|$identity"
-    queue_key="validation:$task:$(printf '%s' "$token" | cksum | awk '{print $1 "-" $2}')"
-    receipt="$STATE/.nm-transition-$task"
-    previous=$(cat "$receipt" 2>/dev/null || true)
-    [ "$previous" != "$token" ] || continue
-    wt=$(fm_meta_get "$meta" worktree)
-    telemetry=$("$SCRIPT_DIR/fm-pipeline-spend.sh" show "$wt" "$run" 2>/dev/null) || telemetry=
-    telemetry=${telemetry:-telemetry: run=$run models=unknown invocations=unknown input=unknown cached=unknown output=unknown}
-    reason="check: validation $task run=$run step=$step state=$state transition=$digest; $telemetry; inspect the current gate/outcome; no automatic gate response"
-    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
-    previous=$(cat "$receipt" 2>/dev/null || true)
-    if [ "$previous" = "$token" ]; then
-      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-      continue
-    fi
-    # Queue before receipt, under the queue's own lock. A crash between these
-    # writes reuses a still-queued identical transition instead of losing it.
-    existing=$(awk -F '\t' -v key="$queue_key" '$4 == key {print; exit}' "$FM_WAKE_QUEUE" 2>/dev/null || true)
-    if [ -z "$existing" ]; then
-      fm_wake_append_locked check "$queue_key" "$reason" || {
-        fm_lock_release "$FM_WAKE_QUEUE_LOCK"; return 1;
-      }
-    fi
-    tmp=$(mktemp "$STATE/.nm-transition-$task.XXXXXX") || {
+  token="$(fm_meta_get "$meta" spawn_gen)|$identity"
+  queue_key="validation:$task:$(printf '%s' "$token" | cksum | awk '{print $1 "-" $2}')"
+  receipt="$STATE/.nm-transition-$task"
+  previous=$(cat "$receipt" 2>/dev/null || true)
+  [ "$previous" != "$token" ] || return 0
+  wt=$(fm_meta_get "$meta" worktree)
+  telemetry=$("$SCRIPT_DIR/fm-pipeline-spend.sh" show "$wt" "$run" 2>/dev/null) || telemetry=
+  telemetry=${telemetry:-telemetry: run=$run models=unknown invocations=unknown input=unknown cached=unknown output=unknown}
+  reason="check: validation $task run=$run step=$step state=$state transition=$digest; $telemetry; inspect the current gate/outcome; no automatic gate response"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  previous=$(cat "$receipt" 2>/dev/null || true)
+  if [ "$previous" = "$token" ]; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    return 0
+  fi
+  # Queue before receipt, under the queue's own lock. A crash between these
+  # writes reuses a still-queued identical transition instead of losing it.
+  existing=$(awk -F '\t' -v key="$queue_key" '$4 == key {print; exit}' "$FM_WAKE_QUEUE" 2>/dev/null || true)
+  if [ -z "$existing" ]; then
+    fm_wake_append_locked check "$queue_key" "$reason" || {
       fm_lock_release "$FM_WAKE_QUEUE_LOCK"; return 1;
     }
-    if ! printf '%s\n' "$token" > "$tmp" || ! mv -f -- "$tmp" "$receipt"; then
-      rm -f -- "$tmp"
-      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-      return 1
-    fi
+  fi
+  tmp=$(mktemp "$STATE/.nm-transition-$task.XXXXXX") || {
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"; return 1;
+  }
+  if ! printf '%s\n' "$token" > "$tmp" || ! mv -f -- "$tmp" "$receipt"; then
+    rm -f -- "$tmp"
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-    wake "$reason"
-  done
-  touch "$STATE/.last-nm-check"
+    return 1
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  wake "$reason"
 }
 
 # Layer 2 + 3 signal scan: status files and turn-end markers.

@@ -296,7 +296,57 @@ EOF
   pass "checkpoint delivers authoritative validation gates without a worker status signal"
 }
 
+test_slow_earlier_ships_do_not_starve_later_gate() {
+  local home status head i
+  home=$(make_home validation-fair-scan)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/checkpoint
+  head=$(git -C "$home/wt" rev-parse HEAD)
+  for i in 01 02 03 04 05 06 07; do
+    fm_git_init_commit "$home/wt-a$i"
+    git -C "$home/wt-a$i" checkout -qb "fm/slow-$i"
+    fm_write_meta "$home/state/a$i.meta" "worktree=$home/wt-a$i" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  done
+  fm_write_meta "$home/state/z-demo.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+sleep 0.1
+case "$*" in
+  'axi status'|'axi status --run RUN1') cat "$NM_FIXTURE" ;;
+  axi)
+    state=$(sed -n 's/^  status: //p' "$NM_FIXTURE" | head -1)
+    printf 'repo: %s\ncount: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  RUN1,fm/checkpoint,%s,%s,\n' "$PWD" "$state" "$NM_HEAD" ;;
+  'daemon status') exit 0 ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: running
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,awaiting_approval,1,100
+branch_sync:
+  state: pipeline_owned
+gate: review
+findings[1]{id,severity,file,action,description}:
+  finding-1,warning,bin/demo.sh,ask-user,needs a decision
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 15 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 0 "$status" "later gate after slow earlier ships: $(cat "$home/out" "$home/err")"
+  assert_contains "$(cat "$home/out")" 'check: validation z-demo' "later ship gate was starved"
+  pass "slow earlier ships yield to later validation gates"
+}
+
 test_validation_gate_without_worker_status_is_delivered
+test_slow_earlier_ships_do_not_starve_later_gate
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
