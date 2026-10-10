@@ -361,15 +361,14 @@ queue_result_wake() {  # <state> <deadline>
   remaining=$(( deadline - $(now) ))
   [ "$remaining" -gt 0 ] || return 1
   fm_wake_append_bounded "$remaining" check startup-network \
-    "check: startup-network: deferred startup network checks finished ($state); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
-    || true
+    "check: startup-network: deferred startup network checks finished ($state); read them with $FM_ROOT/bin/fm-startup-network.sh report"
 }
 
 # Bounded by DELIVERY_DEADLINE, which publish() sets from the delivery budget.
 # Once the deadline passes, a still-live claimant is no longer waited for: the
 # wake decision is made as if it were gone, exactly as the old iteration cap did.
 await_delivery() {  # <generation> <state>
-  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live
+  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live wake_status=0
   while :; do
     claim_live=0
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
@@ -401,9 +400,11 @@ EOF
       [ "$claim_live" -eq 1 ] || rm -f "$CLAIM_FILE" 2>/dev/null || true
     fi
     if [ "$claim_live" -eq 0 ]; then
-      ! report_requires_wake "$state" || queue_result_wake "$state" "$DELIVERY_DEADLINE"
-      fm_lock_release "$PUBLISH_LOCK"
-      return 0
+      if report_requires_wake "$state"; then
+        queue_result_wake "$state" "$DELIVERY_DEADLINE" || wake_status=$?
+      fi
+      fm_lock_release "$PUBLISH_LOCK" || wake_status=1
+      return "$wake_status"
     fi
     fm_lock_release "$PUBLISH_LOCK"
     sleep 0.1

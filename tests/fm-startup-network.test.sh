@@ -532,10 +532,10 @@ EOF
   rc=0
   fm_run_timed 15 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
     FM_SESSION_START_TIMEOUT=2 FM_STARTUP_NETWORK_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
-    FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+  FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     "$root/bin/fm-startup-network.sh" run --locked 0 >/dev/null 2>&1 || rc=$?
   took=$(( $(date +%s) - began ))
-  [ "$rc" -ne 124 ] || fail "startup result delivery exceeded its 2s budget"
+  [ "$rc" -ne 0 ] || fail "startup reported success although required wake publication timed out"
   [ "$took" -le 6 ] || fail "startup result delivery took ${took}s against a 2s deadline"
   report=$(run_stage "$home" "$root" report)
   assert_contains "$report" 'MISSING: some-tool' \
