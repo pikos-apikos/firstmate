@@ -709,7 +709,10 @@ test_branch_outcomes_stay_unread_when_the_drain_cannot_print() {
   : > "$home/config/supervision-host"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
-  FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" >&- 2>/dev/null' "$ROOT/bin/fm-wake-drain.sh" || true
+  # A closed descriptor is reopened as /dev/null when Bash starts a script, so
+  # it does not make the drain's writes fail. /dev/full reliably exercises the
+  # presentation write failure while leaving the outcome store untouched.
+  FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" >/dev/full 2>/dev/null' "$ROOT/bin/fm-wake-drain.sh" || true
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_contains "$drained" "[seq 1] demo: merged the docs fix" "a routine outcome a drain could not print must follow on the next drain"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
