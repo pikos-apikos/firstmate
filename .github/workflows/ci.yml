@@ -179,8 +179,8 @@ jobs:
   tests-portable-serial:
     name: Behavior portable serial ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    # Serial tier (see the timeout policy above).
+    timeout-minutes: 60
     strategy:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
