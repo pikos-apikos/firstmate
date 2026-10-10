@@ -54,7 +54,7 @@ recover "$d" --apply > "$d/applied"
 assert_contains "$(cat "$d/applied")" 'custody_returned' "CLI must confirm custody return"
 [ "$(git -C "$d/wt" rev-parse HEAD)" = "$(git -C "$d/wt" rev-parse candidate)" ] || fail "recovery did not use the candidate"
 recover "$d" --apply > "$d/repeated"
-[ "$(rg -c '^axi sync --recover$' "$d/calls")" = 1 ] || fail "repeated recovery reapplied mutation"
+[ "$(grep -c '^axi sync --recover$' "$d/calls")" = 1 ] || fail "repeated recovery reapplied mutation"
 pass "read-only plan and repeated supported fast-forward custody return"
 
 for kind in dirty divergent missing blocked; do

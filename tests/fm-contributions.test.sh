@@ -512,7 +512,7 @@ test_expired_child_unsupported_forge_stays_unmeasured() {
 }
 
 test_watcher_surfaces_new_contribution_once() {
-  local home out rc rows
+  local home out rc rows sequence generation
   home=$(new_home watcher-contribution)
   forge_home "$home"
   with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
@@ -530,12 +530,21 @@ test_watcher_surfaces_new_contribution_once() {
     || fail "watcher did not surface the durable contribution wake: $(cat "$out")"
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
   [ "$rows" = 1 ] || fail "one contribution signal created $rows durable check wakes"
+  with_home "$home" "$ROOT/bin/fm-wake-drain.sh" > "$home/drain.out" 2> "$home/drain.err" \
+    || fail 'could not present the durable contribution wake before the next checkpoint'
+  sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$home/drain.err")
+  generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$home/drain.err")
+  [ -n "$sequence" ] && [ -n "$generation" ] \
+    || fail 'durable contribution wake did not provide its acknowledgement boundary'
+  with_home "$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$sequence" \
+    --recovery-generation "$generation" \
+    || fail 'could not acknowledge the handled contribution wake'
   rc=0
   with_home "$home" env FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
     "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 2 > "$home/watcher-repeat.out" 2> "$home/watcher-repeat.err" || rc=$?
   [ "$rc" -eq 124 ] || fail "an already durable contribution signal re-rang the watcher: $(cat "$home/watcher-repeat.out")"
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
-  [ "$rows" = 1 ] || fail "repeat contribution observation created $rows durable check wakes"
+  [ "$rows" = 0 ] || fail "repeat contribution observation created $rows durable check wakes after acknowledgement"
   pass 'watcher surfaces one newly durable contribution signal without re-ringing it'
 }
 
