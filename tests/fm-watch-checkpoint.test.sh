@@ -81,7 +81,313 @@ test_existing_singleton_watcher_is_not_success() {
   pass "checkpoint rejects an existing watcher singleton as unowned"
 }
 
+# A home opted into the supervision host whose checkpoint runs a stub host in
+# a fixture code root: the stub records the bound it was given, then closes
+# the way $FM_HOME/host-kind says.
+make_host_home() {  # <name>
+  local home
+  home=$(make_home "$1")
+  mkdir -p "$home/root/bin"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  cat > "$home/root/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'args=%s\nprimary=%s\npark=%s\nlimit=%s\n' "$*" "${FM_SUPERVISION_HOST_PRIMARY:-}" \
+  "${FM_SUPERVISION_HOST_PARK_SECONDS:-}" "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" > "$FM_HOME/host-env"
+case "$(cat "$FM_HOME/host-kind")" in
+  boundary) printf 'supervision-host: cycle boundary - fixture\n' ;;
+  handback)
+    printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+    printf 'signal: demo.status\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
+    ;;
+  stood-down) printf 'supervision-host stood down: this session no longer owns supervision\n' ;;
+esac
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-supervision-host.sh"
+  : > "$home/config/supervision-host"
+  printf '%s\n' "$home"
+}
+
+run_host_checkpoint() {  # <home> <kind> [checkpoint args...]; sets STATUS
+  local home=$1
+  printf '%s\n' "$2" > "$home/host-kind"
+  shift 2
+  STATUS=0
+  FM_HOME="$home" "$home/root/bin/fm-watch-checkpoint.sh" "$@" >"$home/out.txt" 2>"$home/err.txt" || STATUS=$?
+}
+
+test_host_checkpoint_bounds_the_park_by_posture() {
+  local home f
+  home=$(make_host_home host-bound)
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "a host park that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 5s" "the boundary must read as the ordinary quiet line"
+  assert_contains "$(cat "$home/host-env")" $'args=park\nprimary=codex\npark=5\nlimit=1235' \
+    "attended, the host must park for the checkpoint's own bound with the codex pin and a turn limit past it"
+  : > "$home/state/.afk-contract"
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "an away park that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 3600s" "away, the bound must be raised"
+  assert_contains "$(cat "$home/host-env")" 'park=3600' "away, the host must park for the away bound"
+  FM_CODEX_WATCH_CHECKPOINT_AWAY=900 run_host_checkpoint "$home" boundary --seconds 5
+  assert_contains "$(cat "$home/host-env")" 'park=900' "the away bound must be configurable"
+  FM_CODEX_WATCH_CHECKPOINT_AWAY=900 run_host_checkpoint "$home" boundary --seconds 1000
+  assert_contains "$(cat "$home/host-env")" 'park=1000' "the away bound must never shorten a longer checkpoint"
+  # Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+  # QUIET), so the checkpoint keeps its attended bound beside it.
+  for f in fm-afk-contract.sh fm-classify-lib.sh fm-timeout-lib.sh; do cp "$ROOT/bin/$f" "$home/root/bin/$f"; done
+  rm -f "$home/state/.afk-contract"
+  FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    || fail "fixture: could not record quiet mode"
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "a park beside a quiet record that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/host-env")" 'park=5' "beside a quiet record the host must park for the attended bound"
+  pass "checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away"
+}
+
+test_host_checkpoint_passes_a_handback_and_reports_a_stand_down() {
+  local home
+  home=$(make_host_home host-handback)
+  run_host_checkpoint "$home" handback --seconds 5
+  expect_code 0 "$STATUS" "a handed-back wake is an actionable checkpoint"
+  assert_contains "$(cat "$home/out.txt")" $'signal: demo.status\nsupervision-host: the away session could not take this wake' \
+    "the wake and its host line must pass through"
+  assert_not_contains "$(cat "$home/out.txt")" "watcher: started" "the host's cycle status is not part of the wake"
+  run_host_checkpoint "$home" stood-down --seconds 5
+  expect_code 1 "$STATUS" "a host that stood down is a failed checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "supervision-host stood down" "the stand-down must be shown"
+  pass "checkpoint: a handed-back wake passes through, and a host stand-down is a failure"
+}
+
+# The Codex owner stays file-gated: without config/supervision-host, or with
+# config/supervision-host-off, the checkpoint never runs the host.
+test_host_checkpoint_needs_the_file_and_honors_off() {
+  local home line
+  home=$(make_host_home host-gate)
+  for line in - off; do
+    rm -f "$home/config/supervision-host" "$home/config/supervision-host-off" "$home/host-env"
+    [ "$line" = - ] || : > "$home/config/supervision-host-off"
+    run_host_checkpoint "$home" boundary --seconds 1
+    [ ! -e "$home/host-env" ] || fail "a Codex home whose config/supervision-host is ${line/-/absent} ran the supervision host"
+  done
+  pass "checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host"
+}
+
+# The real host under a fake Codex harness that holds the home's session lock.
+# shellcheck disable=SC2016 # the fake harness's script expands in its own shell
+test_real_host_checkpoint_ends_quietly_at_its_bound() {
+  local home fakebin status
+  home=$(make_home host-real)
+  : > "$home/config/supervision-host"
+  fakebin="$TMP_ROOT/host-real-bin"
+  mkdir -p "$fakebin"
+  ln -s /bin/bash "$fakebin/codex"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$fakebin/codex" -c '
+    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    "$0" --seconds 4
+  ' "$CHECKPOINT" >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "a quiet host checkpoint: $(cat "$home/out.txt" "$home/err.txt")"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 4s" "the real host's boundary must read as the quiet line"
+  assert_grep '	boundary	' "$home/state/.supervision-host.log" "the host must have ended its own park"
+  if [ -e "$home/state/.watch.lock/pid" ] && kill -0 "$(cat "$home/state/.watch.lock/pid")" 2>/dev/null; then
+    fail "a host checkpoint left its watcher running"
+  fi
+  pass "checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint"
+}
+
+# The validation daemon changes state even when the worker pane and status log
+# stay unchanged. Use the real crew-state attribution over a real repository.
+test_validation_gate_without_worker_status_is_delivered() {
+  local home status head drained
+  home=$(make_home validation-gate)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/checkpoint
+  head=$(git -C "$home/wt" rev-parse HEAD)
+  fm_write_meta "$home/state/demo.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  'axi status'|'axi status --run RUN1') cat "$NM_FIXTURE" ;;
+  axi)
+    state=$(sed -n 's/^  status: //p' "$NM_FIXTURE" | head -1)
+    printf 'repo: %s\ncount: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  RUN1,fm/checkpoint,%s,%s,\n' "$PWD" "$state" "$NM_HEAD" ;;
+  'daemon status') exit 0 ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: running
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,awaiting_approval,1,100
+branch_sync:
+  state: pipeline_owned
+gate: review
+findings[1]{id,severity,file,action,description}:
+  finding-1,warning,bin/demo.sh,ask-user,needs a decision
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 0 "$status" "a validation gate must wake without worker status or pane churn: $(cat "$home/out" "$home/err")"
+  assert_contains "$(cat "$home/out")" 'check: validation demo' "gate transition was not delivered"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  assert_contains "$drained" 'run=RUN1 step=review state=parked' "gate identity missing from durable wake"
+  assert_contains "$drained" 'invocations=unknown' "missing usage must be explicit"
+  # Presentation alone does not consume the gate. Starting another checkpoint
+  # replays the pending durable wake, even if handling was interrupted.
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 5 >"$home/replay" 2>"$home/replay-err" || status=$?
+  expect_code 0 "$status" "unacknowledged gate must survive interrupted handling"
+  [ "$(awk -F '\t' '$4 ~ /^validation:/ {n++} END {print n+0}' "$home/state/.wake-queue")" = 1 ] \
+    || fail "repeated checkpoint duplicated the gate transition"
+  local cutoff generation
+  cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+  generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+  FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "could not acknowledge handled gate"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 3 >"$home/repeat" 2>"$home/repeat-err" || status=$?
+  expect_code 124 "$status" "the acknowledged unchanged gate must stay silent: $(cat "$home/repeat")"
+  # The CLI's scalar gate and top-level findings can change while its step
+  # remains parked. A changed finding must produce one new actionable wake.
+  sed 's/needs a decision/needs another decision/' "$home/status.toon" > "$home/changed.toon"
+  mv "$home/changed.toon" "$home/status.toon"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/changed" 2>"$home/changed-err" || status=$?
+  if [ "$status" -eq 0 ] && grep -q '^check: rearm-resurface$' "$home/changed"; then
+    drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+    cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+    generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+    FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+      || fail "could not acknowledge checkpoint handoff before changed gate"
+    status=0
+    FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+      NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+      "$CHECKPOINT" --seconds 8 >"$home/changed" 2>"$home/changed-err" || status=$?
+  fi
+  expect_code 0 "$status" "changed findings at the same scalar gate must wake"
+  assert_contains "$(cat "$home/changed")" 'check: validation demo' "changed scalar gate was lost"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  cutoff=$(printf '%s\n' "$drained" | sed -n 's/.*--ack-through \([0-9]*\).*/\1/p' | tail -1)
+  generation=$(printf '%s\n' "$drained" | sed -n 's/.*--recovery-generation \([^ ]*\).*/\1/p' | tail -1)
+  FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "could not acknowledge changed gate"
+  # The checkpoint has expired and there is no watcher now. The daemon's
+  # terminal return must be picked up by the next supported foreground cycle.
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: failed
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,failed,1,200
+outcome: failed
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 8 >"$home/terminal" 2>"$home/terminal-err" || status=$?
+  expect_code 0 "$status" "terminal daemon return after checkpoint expiry must wake"
+  assert_contains "$(cat "$home/terminal")" 'run=RUN1 step=review state=failed' "terminal transition lost after checkpoint expiry"
+  pass "checkpoint delivers authoritative validation gates without a worker status signal"
+}
+
+test_slow_earlier_ships_do_not_starve_later_gate() {
+  local home status head i
+  home=$(make_home validation-fair-scan)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/checkpoint
+  head=$(git -C "$home/wt" rev-parse HEAD)
+  for i in 01 02 03 04 05 06 07; do
+    fm_git_init_commit "$home/wt-a$i"
+    git -C "$home/wt-a$i" checkout -qb "fm/slow-$i"
+    fm_write_meta "$home/state/a$i.meta" "worktree=$home/wt-a$i" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  done
+  fm_write_meta "$home/state/z-demo.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+sleep 0.1
+case "$*" in
+  'axi status'|'axi status --run RUN1') cat "$NM_FIXTURE" ;;
+  axi)
+    state=$(sed -n 's/^  status: //p' "$NM_FIXTURE" | head -1)
+    printf 'repo: %s\ncount: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  RUN1,fm/checkpoint,%s,%s,\n' "$PWD" "$state" "$NM_HEAD" ;;
+  'daemon status') exit 0 ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  cat > "$home/status.toon" <<EOF
+run:
+  id: RUN1
+  branch: fm/checkpoint
+  status: running
+  head: $head
+  steps[1]{step,status,findings,duration_ms}:
+    review,awaiting_approval,1,100
+branch_sync:
+  state: pipeline_owned
+gate: review
+findings[1]{id,severity,file,action,description}:
+  finding-1,warning,bin/demo.sh,ask-user,needs a decision
+EOF
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=1 \
+    NM_FIXTURE="$home/status.toon" NM_HEAD="$head" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 15 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 0 "$status" "later gate after slow earlier ships: $(cat "$home/out" "$home/err")"
+  assert_contains "$(cat "$home/out")" 'check: validation z-demo' "later ship gate was starved"
+  pass "slow earlier ships yield to later validation gates"
+}
+
+test_single_ship_cursor_respects_validation_cadence() {
+  local home status calls
+  home=$(make_home validation-single-cursor)
+  fm_git_init_commit "$home/wt"
+  git -C "$home/wt" checkout -qb fm/single
+  fm_write_meta "$home/state/only.meta" "worktree=$home/wt" 'kind=ship' 'mode=no-mistakes' 'harness=codex' 'spawn_gen=one'
+  mkdir -p "$home/fakebin"
+  cat > "$home/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+calls=$(cat "$NM_CALLS" 2>/dev/null || printf '0')
+printf '%s\n' "$((calls + 1))" > "$NM_CALLS"
+exit 1
+SH
+  chmod +x "$home/fakebin/no-mistakes"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_NM_CHECK_INTERVAL=30 \
+    NM_CALLS="$home/nm-calls" PATH="$home/fakebin:$PATH" \
+    "$CHECKPOINT" --seconds 4 >"$home/out" 2>"$home/err" || status=$?
+  expect_code 124 "$status" "single-ship cadence checkpoint: $(cat "$home/out" "$home/err")"
+  calls=$(cat "$home/nm-calls" 2>/dev/null || printf '0')
+  [ "$calls" -le 3 ] || fail "single ship was polled $calls times inside the 30s cadence"
+  pass "single-ship validation cycle advances its cadence"
+}
+
+test_validation_gate_without_worker_status_is_delivered
+test_slow_earlier_ships_do_not_starve_later_gate
+test_single_ship_cursor_respects_validation_cadence
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
 test_existing_singleton_watcher_is_not_success
+test_host_checkpoint_bounds_the_park_by_posture
+test_host_checkpoint_passes_a_handback_and_reports_a_stand_down
+test_host_checkpoint_needs_the_file_and_honors_off
+test_real_host_checkpoint_ends_quietly_at_its_bound

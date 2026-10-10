@@ -17,10 +17,14 @@
 #     staying "in progress" forever
 #   - phase-aware single-flight: a covering worker is reused, while a later
 #     locked request supersedes an in-flight probe-only worker
+#   - a publish lock a live process holds past the budget ends the worker with a
+#     failed-rerun record instead of an unbounded wait
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$ROOT/bin/fm-timeout-lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-startup-network-tests)
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
@@ -130,6 +134,52 @@ wait_for_startup_network_wake() {  # <home> [tenths]
   grep -Fq $'check\tstartup-network' "$home/state/.wake-queue" 2>/dev/null
 }
 
+# hold_publish_lock <home>: take the stage's publish lock from a separate live
+# process, the way a harvest wedged on a stalled stdout holds it, and print that
+# holder's pid. The holder keeps the pid the lock records, so the lock's
+# stale-owner recovery never reclaims it while the test runs.
+hold_publish_lock() {  # <home>
+  local lock="$1/state/.startup-network.lock" holder waited=0
+  FM_STATE_OVERRIDE="$1/state" FM_ROOT_OVERRIDE="$ROOT" bash -c '
+    . "$1/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2" || exit 1
+    exec sleep 120' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
+  holder=$!
+  while [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$holder" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$holder" ] \
+    || fail "could not hold the publish lock from a second process"
+  printf '%s' "$holder"
+}
+
+hold_state_lock() {  # <home> <lock-path>
+  local home=$1 lock=$2 holder waited=0
+  FM_STATE_OVERRIDE="$home/state" FM_ROOT_OVERRIDE="$ROOT" bash -c '
+    . "$1/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2" || exit 1
+    exec sleep 120' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
+  holder=$!
+  while [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$holder" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$holder" ] \
+    || fail "could not hold state lock $lock from a second process"
+  printf '%s' "$holder"
+}
+
+# await_pid_exit <pid> <tenths>: true when the process exits inside the bound.
+await_pid_exit() {  # <pid> <tenths>
+  local waited=0
+  while kill -0 "$1" 2>/dev/null && [ "$waited" -lt "$2" ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  ! kill -0 "$1" 2>/dev/null
+}
+
 # --- tests -------------------------------------------------------------------
 
 # `start` is called from inside a session-open hook whose stdout the harness
@@ -202,15 +252,13 @@ EOF
   assert_absent "$home/state/.startup-network.claim" "harvest did not release its own claim"
   FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" run --locked 0
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
-    "an unclaimed actionable result never reached the wake queue"
 
   : > "$home/state/.wake-queue"
   FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the dead-claim worker never published"
   wait_for_startup_network_wake "$home" || fail "the dead-claim worker never settled delivery"
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
+  assert_grep $'check\tstartup-network' "$home/state/.wake-queue" \
     "a dead session's stale claim swallowed the result"
   assert_absent "$home/state/.startup-network.claim" "a dead claim was not reaped"
   pass "fm-startup-network: exactly one of the digest and the wake reports each actionable result"
@@ -235,7 +283,7 @@ EOF
   kill "$claimant" 2>/dev/null || true
   wait "$claimant" 2>/dev/null || true
   wait_for_startup_network_wake "$home" || fail "the crash-window worker never settled delivery"
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
+  assert_grep $'check\tstartup-network' "$home/state/.wake-queue" \
     "a claimant crash after publication silently lost the result"
   assert_absent "$home/state/.startup-network.delivered" \
     "an unharvested result was recorded as delivered"
@@ -268,7 +316,7 @@ EOF
   assert_absent "$home/state/.startup-network.delivered" \
     "harvest acknowledged a result whose report was not published"
   wait_for_startup_network_wake "$home" || fail "the report-publication failure suppressed the wake"
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
+  assert_grep $'check\tstartup-network' "$home/state/.wake-queue" \
     "the report-publication failure did not reach the wake queue"
 
   kill "$claimant" 2>/dev/null || true
@@ -339,7 +387,7 @@ EOF
 
   wait_for_startup_network_wake "$home" \
     || fail "an actionable successful (state=done) result never queued a wake"
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
+  assert_grep $'check\tstartup-network' "$home/state/.wake-queue" \
     "an actionable result did not reach the wake queue"
 
   pass "fm-startup-network: an actionable state=done report still queues a wake"
@@ -431,7 +479,7 @@ EOF
   assert_contains "$report" "fm-startup-network.sh run --locked 1" \
     "the timeout line did not say how to rerun the stage"
   wait_for_startup_network_wake "$home" || fail "the timed-out worker never settled delivery"
-  assert_grep 'check	startup-network' "$home/state/.wake-queue" \
+  assert_grep $'check\tstartup-network' "$home/state/.wake-queue" \
     "a timed-out stage did not surface to the agent"
   pass "fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line"
 }
@@ -471,6 +519,30 @@ EOF
     "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
     "a record that outlived the stage bound still read as in progress"
   pass "fm-startup-network: an abandoned run reports as needing a rerun, never as in progress forever"
+}
+
+test_startup_result_delivery_respects_the_worker_deadline() {
+  local rec home root log queue_holder began took rc report
+  rec=$(new_world bounded-wake)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  queue_holder=$(hold_state_lock "$home" "$home/state/.wake-queue.lock")
+  began=$(date +%s)
+  rc=0
+  fm_run_timed 15 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+    FM_SESSION_START_TIMEOUT=2 FM_STARTUP_NETWORK_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
+  FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+    "$root/bin/fm-startup-network.sh" run --locked 0 >/dev/null 2>&1 || rc=$?
+  took=$(( $(date +%s) - began ))
+  [ "$rc" -ne 0 ] || fail "startup reported success although required wake publication timed out"
+  [ "$took" -le 6 ] || fail "startup result delivery took ${took}s against a 2s deadline"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" 'MISSING: some-tool' \
+    "the durable actionable report was lost when wake publication timed out: $report"
+  kill "$queue_holder" 2>/dev/null || true
+  await_pid_exit "$queue_holder" 50 || fail "could not release the wake-queue lock holder"
+  pass "fm-startup-network: wake queue contention cannot outlive the delivery deadline"
 }
 
 test_locked_start_is_not_satisfied_by_an_inflight_probe() {
@@ -759,7 +831,73 @@ GITHUB_TOKEN=ghp_supersecretvalue" \
   pass "fm-startup-network: the timing artifact cannot carry a command line or forge records"
 }
 
+# A live holder of the publish lock used to keep the worker spinning for as long
+# as the lock stayed held - hours, when a harvest wedged on a stalled stdout -
+# with every result discarded at the end. Both the wait before the sweeps and
+# the publication wait after them must give up inside the worker's own budget,
+# record the failure the way `report` already reads a failed stage, and wake.
+test_a_held_publish_lock_cannot_keep_the_worker_alive_past_its_budget() {
+  local rec home root log holder queue_holder began took rc report worker waited
+  rec=$(new_world held-lock)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+
+  # Before the sweeps: the lock is held before the worker even registers.
+  holder=$(hold_publish_lock "$home")
+  queue_holder=$(hold_state_lock "$home" "$home/state/.wake-queue.lock")
+  began=$(date +%s)
+  rc=0
+  fm_run_timed 15 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+    FM_STARTUP_NETWORK_TIMEOUT=2 FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
+    "$root/bin/fm-startup-network.sh" run --locked 0 >/dev/null 2>&1 || rc=$?
+  took=$(( $(date +%s) - began ))
+  [ "$rc" -ne 124 ] || fail "the worker was still waiting on the held publish lock 15s past a 2s budget"
+  [ "$rc" -ne 0 ] || fail "the worker reported success without ever taking the publish lock"
+  [ "$took" -le 6 ] || fail "the worker took ${took}s to give up on a 2s budget"
+  [ ! -f "$log" ] || fail "the sweeps ran even though the worker could not register itself"
+  [ "$(sed -n 's/^state=//p' "$home/state/.startup-network.status")" = failed ] \
+    || fail "a worker that gave up on the lock did not record a failed stage"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" "still held by pid $holder" \
+    "the failed record did not name the process holding the lock: $report"
+  assert_contains "$report" "fm-startup-network.sh run --locked 0" \
+    "the failed record did not say how to rerun the stage"
+  kill "$holder" 2>/dev/null || true
+  await_pid_exit "$holder" 50 || fail "could not release the first lock holder"
+  kill "$queue_holder" 2>/dev/null || true
+  await_pid_exit "$queue_holder" 50 || fail "could not release the wake-queue lock holder"
+
+  # After the sweeps: the worker registers and sweeps freely, then finds the
+  # lock held when it comes to publish. What the sweeps produced must survive.
+  rm -f "$home/state/.wake-queue" "$log"
+  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=2 FM_FAKE_BOOTSTRAP_OUT='PROBE_RAN' \
+    FM_STARTUP_NETWORK_TIMEOUT=10 FM_SESSION_START_TIMEOUT=2 \
+    run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999
+  await_worker_record "$home"
+  worker=$(sed -n 's/^pid=//p' "$home/state/.startup-network.status")
+  waited=0
+  while [ ! -f "$log" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ -f "$log" ] || fail "the detached worker never started its sweep"
+  holder=$(hold_publish_lock "$home")
+  await_pid_exit "$worker" 100 \
+    || fail "the worker was still alive 10s after its sweep finished against a held publish lock (2s delivery budget)"
+  [ "$(sed -n 's/^state=//p' "$home/state/.startup-network.status")" = failed ] \
+    || fail "a worker that could not publish did not record a failed stage"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" "PROBE_RAN" \
+    "the sweep output was discarded when publication found the lock held: $report"
+  assert_contains "$report" "still held by pid $holder" \
+    "the unpublished result did not name the process holding the lock"
+  kill "$holder" 2>/dev/null || true
+  pass "fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record"
+}
+
 test_wait_fails_without_a_published_stage
+test_startup_result_delivery_respects_the_worker_deadline
 test_start_returns_without_holding_the_callers_stdout
 test_harvest_acknowledgement_suppresses_the_wake_and_no_claim_produces_it
 test_a_claimant_crash_after_publish_still_queues_the_wake
@@ -779,4 +917,5 @@ test_records_share_one_origin_so_offsets_form_a_timeline
 test_timings_are_published_and_only_the_on_demand_report_prints_them
 test_a_bounded_run_still_publishes_the_timings_it_managed_to_record
 test_the_timing_artifact_cannot_carry_a_command_line_or_forge_records
+test_a_held_publish_lock_cannot_keep_the_worker_alive_past_its_budget
 echo "# fm-startup-network.test.sh: all assertions passed"
