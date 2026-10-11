@@ -1,0 +1,152 @@
+{
+  "data": {
+    "info": {
+      "id": "ses_ed308e00cffexiBemQwuwiakql",
+      "projectID": "1c9aed15f2544ccf344a9719fcb2050e3ae74fb5",
+      "model": {
+        "id": "space-bunny-free",
+        "providerID": "opencode",
+        "variant": "default"
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 2,
+        "output": 48,
+        "reasoning": 0,
+        "cache": {
+          "read": 20456,
+          "write": 0
+        }
+      },
+      "outcome": "succeeded",
+      "time": {
+        "created": 1791755755529,
+        "updated": 1791755773212,
+        "idle": 1791755773215
+      },
+      "title": "live overlapping parent",
+      "location": {
+        "directory": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/wt"
+      }
+    },
+    "messages": [
+      {
+        "id": "msg_12cf7204a001GXqy6Q9185omvu",
+        "time": {
+          "created": 1791755756032
+        },
+        "text": "Use the shell tool to execute exactly sleep 15, then reply with exactly OVERLAP_PARENT_DONE. This is an isolated timing check. Do not run other tools.",
+        "type": "user"
+      },
+      {
+        "id": "msg_12cf722090010J9xbfsqTooI6C",
+        "time": {
+          "created": 1791755756051,
+          "streamed": 1791755757104,
+          "completed": 1791755772139
+        },
+        "type": "assistant",
+        "agent": "build",
+        "model": {
+          "id": "space-bunny-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "content": [
+          {
+            "type": "tool",
+            "id": "call_01a12cf7258d7591870c0c71",
+            "name": "shell",
+            "executed": false,
+            "state": {
+              "status": "completed",
+              "input": {
+                "command": "sleep 15",
+                "timeout": 30000
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "(no output)"
+                }
+              ],
+              "metadata": {
+                "status": "completed",
+                "truncated": false,
+                "exit": 0
+              }
+            },
+            "time": {
+              "created": 1791755757061,
+              "ran": 1791755757102,
+              "completed": 1791755772130
+            }
+          }
+        ],
+        "snapshot": {
+          "start": "c2acf991702f4a83432a412d47f337d7afdf3a94",
+          "end": "c2acf991702f4a83432a412d47f337d7afdf3a94",
+          "files": []
+        },
+        "finish": "tool-calls",
+        "rawFinish": "tool_calls",
+        "cost": 0,
+        "tokens": {
+          "input": 1,
+          "output": 39,
+          "reasoning": 0,
+          "cache": {
+            "read": 10200,
+            "write": 0
+          }
+        }
+      },
+      {
+        "id": "msg_12cf760f6001iM29Czb5sgl7FI",
+        "time": {
+          "created": 1791755772159,
+          "streamed": 1791755773204,
+          "completed": 1791755773212
+        },
+        "type": "assistant",
+        "agent": "build",
+        "model": {
+          "id": "space-bunny-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "OVERLAP_PARENT_DONE"
+          }
+        ],
+        "snapshot": {
+          "start": "c2acf991702f4a83432a412d47f337d7afdf3a94",
+          "end": "c2acf991702f4a83432a412d47f337d7afdf3a94",
+          "files": []
+        },
+        "finish": "stop",
+        "rawFinish": "stop",
+        "cost": 0,
+        "tokens": {
+          "input": 1,
+          "output": 9,
+          "reasoning": 0,
+          "cache": {
+            "read": 10256,
+            "write": 0
+          }
+        }
+      },
+      {
+        "id": "msg_12cf7651f001cxY5FZn951uXWT",
+        "time": {
+          "created": 1791755773215
+        },
+        "type": "idle",
+        "outcome": "succeeded"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/home/data/oc-live/launch-brief.md records no ship branch; defaulting to legacy branch fm/oc-live
+warning: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/home/data/oc-live/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: oc-live ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned oc-live harness=opencode kind=ship mode=local-only yolo=off window=firstmate:fm-oc-live worktree=/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/wt

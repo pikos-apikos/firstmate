@@ -1,0 +1,71 @@
+{
+  "tested_head_sha": "13877b48e30c625eff93ae50122a0003033dc142",
+  "date": "2026-10-11T21:46:58.244030+00:00",
+  "version": "opencode v2.0.26",
+  "root_cause": "Prior validation lacked live spawn evidence. The requested live behavior succeeds without a source change.",
+  "setup": "Marked disposable FM_HOME, separate scratch git repositories, real tmux private socket, installed OpenCode interactive TUI with --standalone. HOME, TMPDIR and all XDG directories isolated in .oc-lab. Seeded a stopped task and invoked real fm-spawn.sh --relaunch to preserve the existing worktree pool; no global provider or credential changes.",
+  "scenarios": [
+    {
+      "name": "Selected-model worker launch",
+      "result": "pass",
+      "live": true,
+      "command": "bash bin/fm-spawn.sh oc-live --relaunch --model opencode/space-bunny-free",
+      "session_id": "ses_ed313cb67ffexJOJJw2SjHBStq",
+      "actual_model": "opencode/space-bunny-free",
+      "response": "LIVE_MODEL_OK",
+      "evidence": [
+        "live-spawn-selected-session.json",
+        "live-spawn-selected-pane.txt",
+        "live-spawn-config-selected.json"
+      ]
+    },
+    {
+      "name": "Default restores displaced model",
+      "result": "pass",
+      "live": true,
+      "command": "bash bin/fm-spawn.sh oc-live --relaunch --model default",
+      "session_id": "ses_ed3135a8fffeDyN7WyORdDEud9",
+      "actual_model": "opencode/big-pickle",
+      "response": "LIVE_MODEL_OK",
+      "assertions": "Restored original model, removed managed model marker, preserved agent temperature and read permission; permission wildcard remains allow.",
+      "evidence": [
+        "live-spawn-default-session.json",
+        "live-spawn-config-before.json",
+        "live-spawn-config-default.json"
+      ]
+    },
+    {
+      "name": "Tracked project config refusal",
+      "result": "pass",
+      "live": true,
+      "command": "git add -f .opencode/opencode.json; bash bin/fm-spawn.sh oc-live --relaunch --model opencode/space-bunny-free",
+      "exit_code": 1,
+      "config_byte_identical": true,
+      "pane_after_refusal": "bash",
+      "evidence": [
+        "live-spawn-tracked-refusal.log",
+        "live-spawn-tracked-before.json",
+        "live-spawn-tracked-refusal-exit.txt",
+        "live-spawn-tracked-pane-command.txt"
+      ]
+    }
+  ],
+  "focused_regressions": {
+    "exit_code": 0,
+    "tests": [
+      "test_opencode_pins_model_in_worktree_config",
+      "test_opencode_default_restores_displaced_models",
+      "test_opencode_threads_model_and_effort_variant",
+      "test_opencode_refuses_a_tracked_project_config"
+    ],
+    "command": "TMPDIR=\"$PWD/.test-tmp\" bash .test-tmp/focused-opencode.test.sh",
+    "evidence": "live-spawn-focused-opencode.log",
+    "selection": "Temporary executable driver invoked only four existing test functions, asserting observable fm-spawn behavior. Includes displaced top-level and build-agent values, absence of prior model, permission and effort preservation, and tracked deleted config refusal."
+  },
+  "limitations": [
+    "Initial named package test failed at an unrelated secondmate fixture because its temporary home inside this repository is refused. Four focused OpenCode regressions passed.",
+    "Generic fm-control exit reported pending composer text and refused; outside the assigned model scenario. Disposable pane closed through its private tmux socket before replacement."
+  ],
+  "source_changes": false,
+  "cleanup": "TUIs and private tmux stopped; .oc-lab, isolated OpenCode stores, .oc-socket and .test-tmp removed. Existing fleet and shared service preserved."
+}

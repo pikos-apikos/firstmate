@@ -1,0 +1,4 @@
+ok - opencode pins the model in an untracked, git-excluded worktree config
+ok - opencode default restores displaced project and user model values
+ok - opencode stores settings in merged config and default clears Firstmate model pins
+ok - opencode refuses tracked configs whether present or locally deleted

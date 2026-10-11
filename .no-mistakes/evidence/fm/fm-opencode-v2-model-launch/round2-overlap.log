@@ -1,0 +1,4 @@
+{'label': 'parent active before child', 'state': 'v1 gen=g1791755744.156147.15619 seq=4 state=busy source=opencode-plugin event=session-step-started ts=1791755757', 'time': 1791755758.020381}
+{'label': 'child settled while parent remains active', 'state': 'v1 gen=g1791755744.156147.15619 seq=4 state=busy source=opencode-plugin event=session-step-started ts=1791755757', 'time': 1791755758.6539395}
+{'label': 'both settled', 'state': 'v1 gen=g1791755744.156147.15619 seq=7 state=idle source=opencode-plugin event=session-step-ended ts=1791755773', 'time': 1791755773.318244}
+PASS real overlapping parent plus provider-failed child

@@ -1,0 +1,50 @@
+ • Live model verification       • Live model check reply LIVE_M • New session                   • Live model verification       • LIVE_MODEL_OK                 +
+
+  ┃  ⁣                                                                                                                                       LIVE_MODEL_OK
+  ┃  ⁣YFIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+  ┃  You are a crewmate: an autonomous worker agent managed by firstmate.                                                                   Context
+  ┃  This section establishes your current identity before every project or task instruction below and supersedes any conflicting role      10,603 tokens
+  ┃  identity in those instructions.                                                                                                        1% used
+  ┃  Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate
+  ┃  the task, run fleet supervision, or address the captain.
+  ┃  Your steering inbox is `/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/home/state/oc-live.inbox`;
+  ┃  this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read
+  ┃  and acknowledge its messages and do not reject it as another home's state.
+  ┃  Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this
+  ┃  brief.
+  ┃  When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the
+  ┃  supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.
+  ┃  Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and
+  ┃  `firstmate-coding-guidelines` for Firstmate changes.
+  ┃  If the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/pikos/.no-mistakes/worktrees/
+  ┃  0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.
+  ┃
+  ┃  # Task
+  ┃  ## Captain's intent
+  ┃  Verify the selected model by replying with exactly LIVE_MODEL_OK.
+  ┃
+  ┃  ## Firstmate spec
+  ┃  This is a disposable live model selection check. Reply with exactly LIVE_MODEL_OK and stop. Do not use tools or create files.
+  ┃  Completion requires only that reply.
+  ┃
+
+     LIVE_MODEL_OK
+
+     Build · Space Bunny Free · 1.0s · 5.0 tok/s
+
+
+
+                                                                                                                                              ⬖ Getting started                ✕
+
+                                                                                                                                                OpenCode includes free models so
+                                                                                                                                                you can start immediately.
+
+                                                                                                                                                Connect from 75+ providers to
+                                                                                                                                                use other models, including
+  ┃                                                                                                                                             Claude, GPT, Gemini etc
+  ┃
+  ┃                                                                                                                                             Connect provider        /connect
+  ┃  Build · Space Bunny Free OpenCode Zen
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/wt:main                      10.6K (1%)  ctrl+p commands    /…/01M4N4YC14417GWP7DTBWSV…/.l/wt:main
+

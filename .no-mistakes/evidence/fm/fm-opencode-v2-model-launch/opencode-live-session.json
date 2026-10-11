@@ -1,0 +1,89 @@
+{
+  "info": {
+    "id": "ses_ed5a7cd3affePmExk04Ghe4KFi",
+    "projectID": "4543ef05f941fa749aeee49424f45ba51263fe31",
+    "agent": "build",
+    "model": {
+      "id": "space-bunny-free",
+      "providerID": "opencode",
+      "variant": "high"
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 23070,
+      "output": 21,
+      "reasoning": 47,
+      "cache": {
+        "read": 630,
+        "write": 0
+      }
+    },
+    "outcome": "succeeded",
+    "time": {
+      "created": 1791711785733,
+      "updated": 1791711790233,
+      "idle": 1791711790263
+    },
+    "title": "SPACEBUNNY_LIVE_OK",
+    "subpath": ".opencode-live-validation",
+    "location": {
+      "directory": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.opencode-live-validation"
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_12a5832e5001i6zVPdm0iJrQM8",
+      "time": {
+        "created": 1791711786496
+      },
+      "text": "Reply with exactly: SPACEBUNNY_LIVE_OK",
+      "files": [],
+      "agents": [],
+      "type": "user"
+    },
+    {
+      "id": "msg_12a58366c001VP5KuOFzNBwdmr",
+      "time": {
+        "created": 1791711789037,
+        "streamed": 1791711790196,
+        "completed": 1791711790233
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "space-bunny-free",
+        "providerID": "opencode",
+        "variant": "high"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "SPACEBUNNY_LIVE_OK"
+        }
+      ],
+      "snapshot": {
+        "start": "7653e888b7cec7775823caefb4928f411229bea7"
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+        "input": 22547,
+        "output": 10,
+        "reasoning": 0,
+        "cache": {
+          "read": 487,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_12a5844b7001PzAqz60dQcdbfX",
+      "time": {
+        "created": 1791711790263
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+    }
+  ]
+}

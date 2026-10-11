@@ -1,0 +1,1 @@
+v1 gen=g1791755411.114398.13343 seq=3 state=idle source=opencode-plugin event=session-step-ended ts=1791755414

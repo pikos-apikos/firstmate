@@ -1,0 +1,9 @@
+ok - all 5 tracked plugins default-export a distinct id plus setup()
+ok - a v1 named-export plugin module is refused exactly as the OpenCode 2 loader refuses it
+ok - the PreToolUse seatbelt denies an unsafe watcher-arm shape under OpenCode 2's tool name
+ok - the cd seatbelt denies a stray persistent cd and allows unrelated commands
+ok - root resolution follows this instance's own directory, not the canonical checkout
+ok - event handling is scoped to this instance's own location on the shared v2 stream
+ok - the contract helpers classify v2 turn ends and location scoping correctly
+ok - the turn-end guard skips follow-ups by prompted session id
+ok - the watch-arm plugin stops actionable restoration on unload

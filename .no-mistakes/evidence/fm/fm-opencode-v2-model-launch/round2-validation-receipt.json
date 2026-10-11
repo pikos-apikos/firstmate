@@ -1,0 +1,25 @@
+{
+  "tested_head": "13877b48e30c625eff93ae50122a0003033dc142",
+  "time": "2026-10-11T21:58:02.606580+00:00",
+  "version": "opencode v2.0.26",
+  "live_results": [
+    "Selected interactive launch exported opencode/space-bunny-free and LIVE_MODEL_OK",
+    "Default restored prior top-level and build-agent values and retained permission, effort and unrelated keys",
+    "No-prior default removed the managed model",
+    "Tracked present and tracked missing config both refused without modifying or recreating config",
+    "Invalid permission marker and externally changed model both refused without modifications",
+    "Parent plus provider-failed child remained busy, then became idle after parent completion",
+    "Primary unsafe watcher shell command and persistent cd both denied before execution"
+  ],
+  "limitation": "Primary monitoring continuity could not be exercised: plugin child sets FM_ROOT_OVERRIDE and FM_CONFIG_OVERRIDE; marked-lab gate authorization refuses any nonempty overrides. Every allowed lab under this worktree hits the disposable-validation-checkout guard. No test bypass or off-worktree copy was used.",
+  "visual_evidence": "Full terminal cell captures preserved in round2-terminal-captures.html; screenshot attempted with isolated chrome-devtools-axi, which failed because Google Chrome is absent at its configured stable executable path. Browser bridge stopped.",
+  "targeted_checks": "All selected OpenCode spawn, busy lifecycle, and plugin contract checks passed. Initial broader package/selection attempts were blocked by secondmate fixtures prohibited inside the repository; focused selections excluded those unrelated fixtures.",
+  "cleanup": {
+    "private_tmux_server_stopped": true,
+    "isolated_opencode_api_server_stopped": true,
+    "browser_bridge_stopped": true,
+    "lab_and_transient_test_drivers_removed": true,
+    "git_status": "",
+    "source_changes": false
+  }
+}

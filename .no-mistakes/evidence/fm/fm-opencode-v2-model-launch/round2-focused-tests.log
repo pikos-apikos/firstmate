@@ -1,0 +1,11 @@
+ok - opencode stores settings in merged config and default clears Firstmate model pins
+ok - opencode pins the model in an untracked, git-excluded worktree config
+ok - opencode merges, updates, and clears only its own model pin
+ok - opencode default restores displaced project and user model values
+ok - opencode refuses unparseable config without changing or launching
+ok - opencode refuses non-string managed marker values
+ok - opencode refuses tracked configs whether present or locally deleted
+ok - opencode records default model without pinning it and writes permissions
+ok - opencode without an effort keeps its launch config unchanged
+ok - opencode emits the variant for an effort the openai family exposes
+ok - opencode omits the variant for an effort outside the model family's list

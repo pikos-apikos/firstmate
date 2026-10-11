@@ -1,0 +1,155 @@
+{
+  "data": {
+    "info": {
+      "id": "ses_ed30847c1ffe6vsx0UjX01rXhT",
+      "projectID": "global",
+      "model": {
+        "id": "space-bunny-free",
+        "providerID": "opencode",
+        "variant": "default"
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 18777,
+        "output": 118,
+        "reasoning": 63,
+        "cache": {
+          "read": 21596,
+          "write": 0
+        }
+      },
+      "outcome": "succeeded",
+      "time": {
+        "created": 1791755794501,
+        "updated": 1791755797700,
+        "idle": 1791755797703
+      },
+      "title": "live cd seatbelt",
+      "location": {
+        "directory": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/primary"
+      }
+    },
+    "messages": [
+      {
+        "id": "msg_12cf7b8640012038VxnfnYw82E",
+        "time": {
+          "created": 1791755794672
+        },
+        "text": "Use the shell tool to run exactly cd .. && pwd. Do not alter the command. Report the result, then stop.",
+        "type": "user"
+      },
+      {
+        "id": "msg_12cf7b8f3001hKC7oXgdJPatdu",
+        "time": {
+          "created": 1791755794681,
+          "streamed": 1791755795744,
+          "completed": 1791755795784
+        },
+        "type": "assistant",
+        "agent": "build",
+        "model": {
+          "id": "space-bunny-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "content": [
+          {
+            "type": "tool",
+            "id": "call_01a12cf7bca977a0baf4ed51",
+            "name": "shell",
+            "executed": false,
+            "state": {
+              "status": "error",
+              "input": {
+                "command": "cd .. && pwd"
+              },
+              "error": {
+                "type": "unknown",
+                "message": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).\"}"
+              }
+            },
+            "time": {
+              "created": 1791755795727,
+              "ran": 1791755795743,
+              "completed": 1791755795777
+            }
+          }
+        ],
+        "snapshot": {
+          "start": "6800b55d70d00c9ea6f1bb39cd3d5d19cfc35b9c",
+          "end": "6800b55d70d00c9ea6f1bb39cd3d5d19cfc35b9c",
+          "files": []
+        },
+        "finish": "tool-calls",
+        "rawFinish": "tool_calls",
+        "cost": 0,
+        "tokens": {
+          "input": 18608,
+          "output": 31,
+          "reasoning": 0,
+          "cache": {
+            "read": 1494,
+            "write": 0
+          }
+        }
+      },
+      {
+        "id": "msg_12cf7bd510012o6zffFeK91kVK",
+        "time": {
+          "created": 1791755795800,
+          "streamed": 1791755797695,
+          "completed": 1791755797700
+        },
+        "type": "assistant",
+        "agent": "build",
+        "model": {
+          "id": "space-bunny-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "The user asked me to run exactly `cd .. && pwd`. The hook denied it. I should report the result and stop, not attempt a workaround \u2014 the user said \"Do not alter the command. Report the result, then stop.\"\n\nSo report: command blocked by a safety guard.\n\nCaptain address required.",
+            "state": {
+              "reasoningField": "reasoning_content"
+            },
+            "time": {
+              "created": 1791755797227,
+              "completed": 1791755797690
+            }
+          },
+          {
+            "type": "text",
+            "text": "Captain, the command was blocked before it ran.\n\nA safety guard on this session denies a persistent top-level directory change out of the firstmate checkout, which is what `cd ..` is \u2014 it would move the shell outside the home so a later command could run inside a project clone.\n\nNothing executed, so there's no `pwd` result to report. I did not alter or retry the command, per your instruction."
+          }
+        ],
+        "snapshot": {
+          "start": "6800b55d70d00c9ea6f1bb39cd3d5d19cfc35b9c",
+          "end": "6800b55d70d00c9ea6f1bb39cd3d5d19cfc35b9c",
+          "files": []
+        },
+        "finish": "stop",
+        "rawFinish": "stop",
+        "cost": 0,
+        "tokens": {
+          "input": 169,
+          "output": 87,
+          "reasoning": 63,
+          "cache": {
+            "read": 20102,
+            "write": 0
+          }
+        }
+      },
+      {
+        "id": "msg_12cf7c4c600224l1OPCXTeCZBW",
+        "time": {
+          "created": 1791755797703
+        },
+        "type": "idle",
+        "outcome": "succeeded"
+      }
+    ]
+  }
+}

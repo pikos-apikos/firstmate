@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ses_ed30ebee6ffeC8b8T7X1BS3bP1",
+    "title": "Live model check reply LIVE_MODEL_OK",
+    "updated": 1791755373165,
+    "created": 1791755370790,
+    "projectId": "1c9aed15f2544ccf344a9719fcb2050e3ae74fb5",
+    "directory": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/wt"
+  },
+  {
+    "id": "ses_ed30f7b41ffeDWFOrzfpcwMd5N",
+    "title": "Live model verification",
+    "updated": 1791755323922,
+    "created": 1791755322572,
+    "projectId": "1c9aed15f2544ccf344a9719fcb2050e3ae74fb5",
+    "directory": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M4N4YC14417GWP7DTBWSVHTF/.l/wt"
+  }
+]

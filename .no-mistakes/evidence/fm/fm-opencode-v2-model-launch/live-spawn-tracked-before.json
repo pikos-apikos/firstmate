@@ -1,0 +1,1 @@
+{"x-firstmate-model-pin":{"previousPermissionWildcardPresent":false,"managedPermissionWildcard":"allow"},"model":"opencode/big-pickle","agent":{"build":{"temperature":0.4}},"permission":{"read":"ask","*":"allow"}}
