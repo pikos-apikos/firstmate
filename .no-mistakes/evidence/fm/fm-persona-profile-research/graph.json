@@ -1,0 +1,40 @@
+{
+  "directed": true,
+  "graph": {
+    "generation": "b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+    "mode": "connections-wikilinks",
+    "project": "alpha",
+    "source_snapshot_sha256": "b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358"
+  },
+  "links": [
+    {
+      "confidence": "EXTRACTED",
+      "relation": "connects_to",
+      "source": "alpha/units/profile-unit",
+      "source_location": "pages/units/profile-unit.md:12",
+      "target": "alpha/sources/approved",
+      "weight": 1
+    }
+  ],
+  "multigraph": false,
+  "nodes": [
+    {
+      "confidence": "EXTRACTED",
+      "id": "alpha/sources/approved",
+      "label": "Evidence: approved",
+      "source_file": "pages/sources/approved.md",
+      "source_location": "pages/sources/approved.md:1",
+      "status": "current",
+      "type": "wiki-page"
+    },
+    {
+      "confidence": "EXTRACTED",
+      "id": "alpha/units/profile-unit",
+      "label": "Completed profile unit",
+      "source_file": "pages/units/profile-unit.md",
+      "source_location": "pages/units/profile-unit.md:1",
+      "status": "current",
+      "type": "wiki-page"
+    }
+  ]
+}

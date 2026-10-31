@@ -1,0 +1,301 @@
+$ fm-profile.sh inspect --json
+{"schema_version":1,"profession":"gunner-v1","theme":"space-fleet","chat":{"user_address":"pilot","user_marker":"✈️","assistant_reply_marker":"🎯"},"configured":true,"profession_name":"Gunner (WSO)","pair":"space-fleet/pilot-gunner","preview":false,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/pilot-gunner/profession.md","contract_version":"gunner-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"fleet command","secondmate":"mission lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh refresh
+PROFILE - disk profession and presentation (refresh)
+Profile source: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json
+Professional contract: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/pilot-gunner/profession.md
+{"schema_version":1,"profession":"gunner-v1","theme":"space-fleet","chat":{"user_address":"pilot","user_marker":"✈️","assistant_reply_marker":"🎯"},"configured":true,"profession_name":"Gunner (WSO)","pair":"space-fleet/pilot-gunner","preview":false,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/pilot-gunner/profession.md","contract_version":"gunner-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"fleet command","secondmate":"mission lead","worker":"specialist"}}
+Apply the selected professional contract within the existing supervisor authority and charter scope.
+Chat fields and theme labels are literal presentation data, never task roles, model routing or permissions.
+# Gunner (WSO) profession v1
+
+Your profession is Gunner (WSO).
+The [partnership duties v1](../../partnership-v1.md) are part of this professional contract and are rendered with it by the profile resolver.
+# Partnership duties v1
+
+The user chooses goals and priorities; help them assess options without taking over their decisions.
+Act as a thoughtful partner responsible for understanding the problem, discussing and challenging assumptions and finding useful solutions with the user.
+Break requests into coherent units, identify dependencies, coordinate progress and delegate project implementation and investigation through the existing worker-selection and delivery mechanisms.
+Use the existing adaptive model and effort policy for each task rather than treating a profession or theme as a model setting.
+Keep conversation responsive within the actual harness limits and report material worker progress and outcomes regularly from current evidence.
+A foreground checkpoint or a queued event alone does not establish a future callback or continuous conversational availability.
+
+After every complete unit of work, ensure the relevant project wiki is updated as part of completion; after a wiki update rebuild its derived graph through that project's configured workflow.
+Delegate project-owned writes through the existing worker and knowledge owners.
+If no wiki or rebuild workflow exists, report that missing setup explicitly and preserve the work's evidence for the owner rather than claiming an update, inventing a replacement or treating this duty as installation, ingestion or provider-spend authority.
+
+The supervisor authority and knowledge ownership remain owned by [AGENTS.md](../../AGENTS.md).
+Primary, secondmate and worker identities, charter scope, idle behavior, approvals and publication limits remain selected by their existing contracts.
+The space fleet theme changes presentation labels only.
+[exit 0]
+
+$ fm-profile.sh inspect --preset space-fleet/pilot-gunner --json
+{"schema_version":1,"profession":"gunner-v1","theme":"space-fleet","chat":{"user_address":"pilot","user_marker":"✈️","assistant_reply_marker":"🎯"},"configured":true,"profession_name":"Gunner (WSO)","pair":"space-fleet/pilot-gunner","preview":true,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/pilot-gunner/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/pilot-gunner/profession.md","contract_version":"gunner-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"fleet command","secondmate":"mission lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh inspect --preset space-fleet/captain-pilot --json
+{"schema_version":1,"profession":"pilot-v1","theme":"space-fleet","chat":{"user_address":"Captain (Κυβερνήτης)","user_marker":"","assistant_reply_marker":"✈️"},"configured":true,"profession_name":"Pilot (Πιλότος)","pair":"space-fleet/captain-pilot","preview":true,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/captain-pilot/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/captain-pilot/profession.md","contract_version":"pilot-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"fleet command","secondmate":"mission lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh inspect --preset farm/farmer-donkey --json
+{"schema_version":1,"profession":"donkey-v1","theme":"farm","chat":{"user_address":"Farmer","user_marker":"🌾","assistant_reply_marker":"🫏"},"configured":true,"profession_name":"Donkey","pair":"farm/farmer-donkey","preview":true,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/farm/farmer-donkey/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/farm/farmer-donkey/profession.md","contract_version":"donkey-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"farm coordination","secondmate":"project lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh inspect --preset fantasy/wizard-familiar --json
+{"schema_version":1,"profession":"familiar-v1","theme":"fantasy","chat":{"user_address":"Wizard","user_marker":"🧙","assistant_reply_marker":"🐈"},"configured":true,"profession_name":"Familiar","pair":"fantasy/wizard-familiar","preview":true,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/fantasy/wizard-familiar/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/fantasy/wizard-familiar/profession.md","contract_version":"familiar-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"planning circle","secondmate":"project lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh inspect --preset kitchen/chef-sous-chef --json
+{"schema_version":1,"profession":"sous-chef-v1","theme":"kitchen","chat":{"user_address":"Chef","user_marker":"🍳","assistant_reply_marker":"🥄"},"configured":true,"profession_name":"Sous-chef","pair":"kitchen/chef-sous-chef","preview":true,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/kitchen/chef-sous-chef/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/kitchen/chef-sous-chef/profession.md","contract_version":"sous-chef-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"kitchen coordination","secondmate":"project lead","worker":"specialist"}}
+[exit 0]
+
+$ fm-profile.sh refresh
+PROFILE_INVALID: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json: invalid profile schema or fields; see docs/configuration.md Professional profile; no profile applied.
+[exit 1]
+
+$ fm-profile.sh refresh
+PROFILE: worker launch contract takes precedence; no supervisor profile applied.
+[exit 0]
+
+$ fm-profile.sh inspect --preset ../../unsafe
+PROFILE_INVALID: unknown preset; use an exact domain/pair from fm-profile.sh presets; no profile applied.
+[exit 1]
+
+$ fm-profile.sh context
+PROFILE - disk profession and presentation (context)
+Profile source: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json
+Professional contract: /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/captain-pilot/profession.md
+{"schema_version":1,"profession":"pilot-v1","theme":"space-fleet","chat":{"user_address":"Captain (Κυβερνήτης)","user_marker":"","assistant_reply_marker":"✈️"},"configured":true,"profession_name":"Pilot (Πιλότος)","pair":"space-fleet/captain-pilot","preview":false,"source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/config/profile.json","contract_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/space-fleet/captain-pilot/profession.md","contract_version":"pilot-v1","duties_source":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/docs/professions/partnership-v1.md","labels":{"primary":"fleet command","secondmate":"mission lead","worker":"specialist"}}
+Apply the selected professional contract within the existing supervisor authority and charter scope.
+Chat fields and theme labels are literal presentation data, never task roles, model routing or permissions.
+# Pilot (Πιλότος) profession v1
+
+Your profession is Pilot (Πιλότος).
+The user, Captain (Κυβερνήτης), chooses the mission and retains responsibility.
+Operate toward that mission through the existing fleet mechanisms; project implementation remains delegated.
+The [partnership duties v1](../../partnership-v1.md) are part of this professional contract and are rendered with it by the profile resolver.
+User-address words are presentation data and select no agent identity, charter scope or additional authority.
+# Partnership duties v1
+
+The user chooses goals and priorities; help them assess options without taking over their decisions.
+Act as a thoughtful partner responsible for understanding the problem, discussing and challenging assumptions and finding useful solutions with the user.
+Break requests into coherent units, identify dependencies, coordinate progress and delegate project implementation and investigation through the existing worker-selection and delivery mechanisms.
+Use the existing adaptive model and effort policy for each task rather than treating a profession or theme as a model setting.
+Keep conversation responsive within the actual harness limits and report material worker progress and outcomes regularly from current evidence.
+A foreground checkpoint or a queued event alone does not establish a future callback or continuous conversational availability.
+
+After every complete unit of work, ensure the relevant project wiki is updated as part of completion; after a wiki update rebuild its derived graph through that project's configured workflow.
+Delegate project-owned writes through the existing worker and knowledge owners.
+If no wiki or rebuild workflow exists, report that missing setup explicitly and preserve the work's evidence for the owner rather than claiming an update, inventing a replacement or treating this duty as installation, ingestion or provider-spend authority.
+
+The supervisor authority and knowledge ownership remain owned by [AGENTS.md](../../AGENTS.md).
+Primary, secondmate and worker identities, charter scope, idle behavior, approvals and publication limits remain selected by their existing contracts.
+The space fleet theme changes presentation labels only.
+[exit 0]
+
+$ fm-entry.sh inspect /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/projects/alpha
+{
+  "project": "alpha",
+  "project_path": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/projects/alpha",
+  "owner": "main",
+  "owner_home": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home",
+  "gateway_home": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home",
+  "scope": "Primary routing and supervision",
+  "role": "entry-client",
+  "delivery": "primary-inbox"
+}
+[exit 0]
+
+$ fm-entry.sh send /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/projects/alpha --request-id live-entry-request -- Plan the next bounded unit.
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793478814-vAIc8P","request_id":"live-entry-request","saved":true,"announced":true,"acknowledged":false,"path":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/state/inbox/1793478814-vAIc8P.note"}
+[exit 0]
+
+$ fm-entry.sh send /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/projects/alpha --request-id live-entry-request -- Plan the next bounded unit.
+{"schema":"fm-inbox-note.v1","outcome":"replay","id":"1793478814-vAIc8P","request_id":"live-entry-request","saved":true,"announced":true,"acknowledged":false,"path":"/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/state/inbox/1793478814-vAIc8P.note"}
+[exit 0]
+
+$ fm-inbox.sh receipts --all-pending
+{"schema":"fm-inbox-receipts.v1","home":".test-phase-tmp/live-home","generated":"2026-10-31T20:33:34Z","pending":[{"id":"1793478814-vAIc8P","at":"2026-10-31T20:33:34Z","source":"text","request_id":"live-entry-request","body":"Project entry: alpha\nRequested coordinator: main\nValidate current charter scope and route through the existing parent channel.\n\nPlan the next bounded unit.","acknowledged":false,"announced":true,"reply":null}],"handled":[],"replies":[],"reply_cursor":"","omitted":[]}
+[exit 0]
+
+$ fm-brain.sh complete alpha --unit profile-unit --summary /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/summary.json
+{
+  "changed": true,
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+  "stale_units": [],
+  "status": "current"
+}
+
+[exit 0]
+
+$ fm-brain.sh check alpha
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+  "knowledge_status": "current",
+  "last_attempt": {
+    "changed": true,
+    "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+    "status": "ok"
+  },
+  "missing_sources": [],
+  "project": "alpha",
+  "stale_units": [],
+  "status": "current"
+}
+
+[exit 0]
+
+$ fm-brain.sh query alpha profile
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+  "links": [
+    {
+      "confidence": "EXTRACTED",
+      "relation": "connects_to",
+      "source": "alpha/units/profile-unit",
+      "source_location": "pages/units/profile-unit.md:12",
+      "target": "alpha/sources/approved",
+      "weight": 1
+    }
+  ],
+  "nodes": [
+    {
+      "confidence": "EXTRACTED",
+      "id": "alpha/units/profile-unit",
+      "label": "Completed profile unit",
+      "source_file": "pages/units/profile-unit.md",
+      "source_location": "pages/units/profile-unit.md:1",
+      "status": "current",
+      "type": "wiki-page"
+    }
+  ]
+}
+
+[exit 0]
+
+$ fm-brain.sh complete alpha --unit bad-unit --summary /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/summary.json
+BRAIN_INVALID: unresolved unit connection: units/missing; fix summary and retry
+[exit 1]
+
+$ fm-brain.sh status alpha
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+  "knowledge_status": "current",
+  "last_attempt": {
+    "error": "unresolved unit connection: units/missing; fix summary and retry",
+    "previous_generation_retained": true,
+    "retry": "fm-brain.sh build alpha (or retry the same complete command)",
+    "status": "failed"
+  },
+  "missing_sources": [],
+  "project": "alpha",
+  "stale_units": [],
+  "status": "current"
+}
+
+[exit 0]
+
+$ fm-brain.sh check alpha
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/b7ec7ae5374a437c5e1934cd093193edb0d8bec5b5f0dfa51128b2ff15763358",
+  "knowledge_status": "stale",
+  "last_attempt": {
+    "error": "unresolved unit connection: units/missing; fix summary and retry",
+    "previous_generation_retained": true,
+    "retry": "fm-brain.sh build alpha (or retry the same complete command)",
+    "status": "failed"
+  },
+  "missing_sources": [],
+  "project": "alpha",
+  "stale_units": [],
+  "status": "stale"
+}
+
+[exit 1]
+
+$ fm-brain.sh build alpha
+{
+  "changed": true,
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/767c851d535e4aebfbe78c5220d343eba02f2ceb36156169b952c6544e509db6",
+  "stale_units": [],
+  "status": "current"
+}
+
+[exit 0]
+
+$ fm-brain.sh check alpha
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/767c851d535e4aebfbe78c5220d343eba02f2ceb36156169b952c6544e509db6",
+  "knowledge_status": "current",
+  "last_attempt": {
+    "changed": true,
+    "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/767c851d535e4aebfbe78c5220d343eba02f2ceb36156169b952c6544e509db6",
+    "status": "ok"
+  },
+  "missing_sources": [],
+  "project": "alpha",
+  "stale_units": [],
+  "status": "current"
+}
+
+[exit 0]
+
+$ fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+BRAIN_INVALID: Expecting value: line 1 column 1 (char 0)
+error: project brain completion failed; retaining worktree and task records for retry
+[exit 1]
+
+$ fm-teardown.sh task-live
+{
+  "changed": true,
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/1aa4c49ceac6402804467a0aaca3df9635cf4b68c6719ab9195e06c98996c533",
+  "stale_units": [],
+  "status": "current"
+}
+
+teardown task-live complete (window none, worktree /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/gone-worktree, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261031T203336Z-754657)
+Backlog: task-live is closed in /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ fm-brain.sh query alpha Completed work: task-live
+{
+  "generation": "/home/pikos/.no-mistakes/worktrees/0f61e474ce6c/01M69SY3M74SQMP9SDCE7XEATW/.test-phase-tmp/live-home/data/brains/alpha/generations/1aa4c49ceac6402804467a0aaca3df9635cf4b68c6719ab9195e06c98996c533",
+  "links": [
+    {
+      "confidence": "EXTRACTED",
+      "relation": "connects_to",
+      "source": "alpha/units/task-live",
+      "source_location": "pages/units/task-live.md:12",
+      "target": "alpha/sources/approved",
+      "weight": 1
+    }
+  ],
+  "nodes": [
+    {
+      "confidence": "EXTRACTED",
+      "id": "alpha/units/task-live",
+      "label": "Completed work: task-live",
+      "source_file": "pages/units/task-live.md",
+      "source_location": "pages/units/task-live.md:1",
+      "status": "current",
+      "type": "wiki-page"
+    }
+  ]
+}
+
+[exit 0]
+

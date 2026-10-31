@@ -1,0 +1,22 @@
+FM_TEST_BEGIN 2026-10-31T20:31:50Z tests/fm-brain.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-31T20:31:50Z tests/fm-profile.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-31T20:31:50Z tests/fm-project-entry.test.sh family=pure-contract-unit expected_gate_skip=none
+ok: single-owner project entry, two clients, idempotent parent relay, isolation and refusal
+FM_TEST_END 2026-10-31T20:31:50Z tests/fm-project-entry.test.sh exit=0 duration_ms=489 gate_skip=false
+ok - no-profile inspection preserves existing preferences without mutation
+ok - profession and theme resolve independently and refresh rereads disk duties
+ok - Captain/Pilot is a separate disk profession; presentation titles do not choose agent roles
+ok - a missing shared duties contract refuses the named profession before rendering
+ok - five known domain/pair presets resolve real files without changing home selection or accepting arbitrary paths
+ok - malformed, unknown, injectable and unsafe profiles fail without activation
+ok - worker launch identity wins before reading home profile
+ok - validated profile inheritance preserves child charter/preferences and mirrors absence
+ok - remote receiver validates profile payload before generation and destination publication
+FM_TEST_END 2026-10-31T20:31:52Z tests/fm-profile.test.sh exit=0 duration_ms=2191 gate_skip=false
+ok: completion, idempotence, source add/change/delete, stale references, retained prior generation, retry, isolation
+FM_TEST_END 2026-10-31T20:31:58Z tests/fm-brain.test.sh exit=0 duration_ms=8187 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=8323
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=10867 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-brain.test.sh duration_ms=8187
+FM_TEST_SLOWEST rank=2 script=tests/fm-profile.test.sh duration_ms=2191
+FM_TEST_SLOWEST rank=3 script=tests/fm-project-entry.test.sh duration_ms=489
