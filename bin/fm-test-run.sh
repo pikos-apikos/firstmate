@@ -298,7 +298,7 @@ family_for_basename() {
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|fm-read-repetition.test.sh|\
     fm-calm-claude-mod.test.sh|\
-    fm-harness-adapter-references.test.sh|fm-project-mode.test.sh|\
+    fm-harness-adapter-references.test.sh|fm-project-mode.test.sh|fm-profile.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
     fm-subagent-pretool-check.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
@@ -1482,6 +1482,10 @@ families_for_unmapped_bin() {
 families_for_changed_path() {
   local path=$1 fixture_ref capture_ref
   case "$path" in
+    bin/fm-profile.sh|bin/fm-profile-lib.sh|docs/professions/*)
+      printf '%s\n' __script__:fm-profile.test.sh
+      printf '%s\n' __script__:fm-sessionstart-nudge.test.sh
+      ;;
     tests/fm-backend-herdr-eventwait.test.py)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch

@@ -1047,6 +1047,71 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test 
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
 
+## Professional profile (config/profile.json)
+
+An optional private profile selects a persisted supervisor profession and chat presentation.
+Homes without `config/profile.json` retain the existing contract, startup digest, continuation output and generated worker briefs.
+Profiles grant no permissions and change no task role, charter, model, account, delivery path or merge policy.
+Worker launch contracts take precedence; workers never load supervisor profiles.
+A configured profile replaces the default chat address and nautical presentation conventions only; current explicit user instructions retain their existing precedence.
+
+The version 1 schema accepts only these fields:
+
+| Field | Accepted value |
+| --- | --- |
+| `schema_version` | Required number `1`. |
+| `profession` | Required selector from the shipped [catalog](professions/catalog.json). |
+| `theme` | Optional catalog theme, independent of profession; defaults to the selected profession's preset. |
+| `chat` | Optional object containing only the three fields below. |
+| `chat.user_address` | An ASCII title starting with a letter, followed by at most 31 letters, digits, underscores or hyphens, or the exact title `Captain (Κυβερνήτης)`. |
+| `chat.user_marker` | The selected preset's user marker or an empty string. |
+| `chat.assistant_reply_marker` | The selected preset's fixed assistant marker, including empty for `firstmate-v1`. |
+
+Omitted chat fields use the selected preset's defaults.
+A profile must be one JSON object in a readable, regular, single-linked file of at most 4096 bytes beneath a non-symlinked config directory.
+Unknown fields, selectors, themes, null values and instruction-like address strings are rejected with `PROFILE_INVALID` before any professional context is rendered.
+Startup continues with the diagnostic and the existing contract; explicit inspection or refresh exits nonzero.
+Correct or remove malformed input rather than relying on a last-good cache.
+
+The catalog maps stable selectors to five ordinary disk presets and named contracts under `docs/professions/<domain>/<partners>/`:
+
+| Pair | Preset and named contract |
+| --- | --- |
+| pilot / Gunner (WSO) | [preset](professions/space-fleet/pilot-gunner/profile.json), [contract](professions/space-fleet/pilot-gunner/profession.md) |
+| Captain (Κυβερνήτης) / Pilot (Πιλότος) | [preset](professions/space-fleet/captain-pilot/profile.json), [contract](professions/space-fleet/captain-pilot/profession.md) |
+| Farmer / Donkey | [preset](professions/farm/farmer-donkey/profile.json), [contract](professions/farm/farmer-donkey/profession.md) |
+| Wizard / Familiar | [preset](professions/fantasy/wizard-familiar/profile.json), [contract](professions/fantasy/wizard-familiar/profession.md) |
+| Chef / Sous-chef | [preset](professions/kitchen/chef-sous-chef/profile.json), [contract](professions/kitchen/chef-sous-chef/profession.md) |
+
+Named professions share [partnership duties](professions/partnership-v1.md) within the existing supervisor contract.
+The optional [firstmate profession](professions/firstmate-v1.md) can also be selected explicitly.
+Themes supply presentation labels; internal primary, secondmate and worker identities remain unchanged.
+Playful names imply neither fictional actions nor additional capabilities.
+
+`bin/fm-profile.sh --help` owns the read-only inspect, refresh, context and preset-preview commands.
+For example, preview a known pairing without reading or changing the home selection:
+
+```sh
+bash bin/fm-profile.sh refresh --preset space-fleet/pilot-gunner
+```
+
+To select it, deliberately copy its reviewed `profile.json` into the intended home's `config/`, then use `FM_HOME=<home> bash bin/fm-profile.sh refresh` in the receiving supervisor.
+The resolver always loads the catalog, presets and contracts from its own checkout; `FM_HOME` selects private data only.
+Inspection reports the selection, source paths and contract version; refresh renders current disk context for that receiving session and does not inject it into another process.
+Context and refresh emit nothing when no profile exists.
+Removing a selection restores default startup output; a restored conversation may still require rereading its original contract to replace earlier chat conventions.
+
+Fresh startup and context re-emission render a valid configured profile only.
+The existing run wrapper refreshes configured profiles for resume, reload and fork when that session still owns the home; a new process receives the ordinary startup instruction.
+[Session-start coverage](sessionstart-nudge.md) owns harness transport coverage and limits; interactive Codex TUI has no automatic tracked resume/compaction channel, so use explicit refresh there.
+Profiles add no continuous background attention or unattended callback.
+
+The existing inherited-config path carries only the validated `config/profile.json`; contracts travel with tracked code sync.
+Local propagation and remote sender/receiver validation reject malformed input before publishing it, preserving the previous destination.
+The receiving secondmate retains its charter and local preferences and uses the existing exact-byte reread protocol before refreshing the profile.
+Primary removal mirrors absence through that same path.
+No worker brief, model pin or primary private preference file is copied as part of profile inheritance.
+
 ## Captain Preferences (data/captain.md / data/captain-shared.md)
 
 Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/secondmates.md`.

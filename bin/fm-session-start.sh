@@ -885,6 +885,19 @@ fi
   --afk-mode "$AFK_MODE" \
   --x-mode "$X_MODE_PRESENT"
 
+# Both true starts and context re-emits render only an actual configured profile.
+PROFILE_CONFIG="$CONFIG/profile.json"
+if [ -z "${FM_TASK_ID:-}" ] && { [ -e "$PROFILE_CONFIG" ] || [ -L "$PROFILE_CONFIG" ]; }; then
+  if PROFILE_CONTEXT=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" bash "$SCRIPT_DIR/fm-profile.sh" context 2>&1); then
+    if [ -n "$PROFILE_CONTEXT" ]; then
+      section "PROFESSIONAL PROFILE"
+      printf '%s\n' "$PROFILE_CONTEXT"
+    fi
+  else
+    printf '%s\n' "$PROFILE_CONTEXT"
+  fi
+fi
+
 # --- 5. read-once contract -------------------------------------------------
 # Ahead of the two digests it governs, not after them: a truncated tail is
 # exactly what drops a closing reminder, and this contract is what stops the

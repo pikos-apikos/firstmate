@@ -1094,6 +1094,38 @@ test_run_reports_a_failed_session_start_as_digest_text() {
   pass "run wrapper: a session start that cannot take the lock still opens the session and says so"
 }
 
+test_profile_context_across_session_sources() {
+  local root="$TMP_ROOT/profile-sources" out source
+  make_run_primary "$root"
+  printf '%s\n' '{"schema_version":1,"profession":"gunner-v1"}' > "$root/config/profile.json"
+  for source in startup clear compact resume reload fork; do
+    out=$(run_hook "$root" --source "$source" </dev/null)
+    assert_contains "$out" 'Your profession is Gunner (WSO).' "$source lost the configured contract"
+    assert_contains "$out" 'never task roles, model routing or permissions' "$source lost the presentation boundary"
+  done
+  printf '%s\n' broken > "$root/config/profile.json"
+  for source in startup compact resume reload; do
+    out=$(run_hook "$root" --source "$source" </dev/null)
+    assert_contains "$out" PROFILE_INVALID "$source silently ignored a bad selection"
+    assert_not_contains "$out" 'PROFESSIONAL PROFILE' "$source presented invalid selection as context"
+    assert_not_contains "$out" 'Your profession is' "$source partially activated invalid selection"
+  done
+  rm "$root/config/profile.json"
+  for source in startup clear compact resume reload fork; do
+    out=$(run_hook "$root" --source "$source" </dev/null)
+    assert_not_contains "$out" PROFILE "$source changed no-profile output"
+    case "$source" in resume|reload|fork) [ -z "$out" ] || fail "$source must retain historical silence" ;; esac
+  done
+  printf '%s\n' broken > "$root/config/profile.json"
+  for source in startup clear compact resume reload fork; do
+    out=$(FM_TASK_ID=isolated-worker run_hook "$root" --source "$source" </dev/null)
+    assert_not_contains "$out" PROFILE_INVALID "$source read irrelevant malformed worker profile"
+    assert_not_contains "$out" 'Your profession is' "$source applied supervisor profession to a worker"
+    assert_not_contains "$out" 'thoughtful partner' "$source applied supervisor duties to a worker"
+  done
+  pass 'profile context follows configured startup/continuations; invalid input stays diagnostic; workers stay isolated'
+}
+
 test_genuine_primary_nudges
 test_gate_env_is_silent
 test_gate_common_dir_is_silent
@@ -1120,3 +1152,5 @@ test_pi_startup_classifies_cli_continuations
 test_pi_sessionstart_generation_prerequisite
 test_pi_reload_releases_sessionstart_exit_listener
 test_pi_large_sessionstart_digest_is_delivered_loudly
+
+test_profile_context_across_session_sources

@@ -676,6 +676,34 @@
     {
       "path": ".agents/skills/validation-supervision/SKILL.md",
       "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/fantasy/wizard-familiar/profession.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/farm/farmer-donkey/profession.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/firstmate-v1.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/kitchen/chef-sous-chef/profession.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/partnership-v1.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/space-fleet/captain-pilot/profession.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/professions/space-fleet/pilot-gunner/profession.md",
+      "audience": "agent-runtime"
     }
   ]
 }
